@@ -1,0 +1,239 @@
+ <?xml version="1.0" ?>
+<robot name="crazyflie">
+   <!-- <link name="world"/>
+  <link name="connector">
+    <inertial>
+      <mass value="0.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
+    </inertial>
+  </link>
+  <joint name="world_to_connector" type="fixed">
+    <parent link="world"/>
+    <child link="connector"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <joint name="connector_to_body" type="fixed">
+    <parent link="connector"/>
+    <child link="body"/>
+    <origin xyz="0 0 -0.25" rpy="0 0 0"/>
+  </joint>  -->
+
+
+  <!-- 三自由度 -->
+<!-- <link name="world"/>
+  <link name="base1">
+    <inertial>
+      <mass value="1.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
+    </inertial>
+  </link>
+  <link name="base2">
+    <inertial>
+      <mass value="1.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
+    </inertial>
+  </link>
+  <link name="connector">
+    <inertial>
+      <mass value="1.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0" ixy="0" ixz="0" iyy="0.0" iyz="0" izz="0.0"/>
+    </inertial>
+  </link>
+  <joint name="world_to_base1" type="continuous">
+    <parent link="world"/>
+    <child link="base1"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+  <joint name="base1_to_base2" type="continuous">
+    <parent link="base1"/>
+    <child link="base2"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <joint name="base2_to_connector" type="continuous">
+    <parent link="base2"/>
+    <child link="connector"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+  </joint>
+  <joint name="connector_to_body" type="fixed">
+    <parent link="connector"/>
+    <child link="body"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint> 
+   -->
+
+
+
+
+  
+  <!-- 机身 -->
+  <link name="body">
+    <inertial>
+      <!-- 机身质量 -->
+      <mass value="0.025"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <!-- 惯性张量 -->
+      <inertia ixx="0.000016572" ixy="0.0" ixz="0.0" iyy="0.000016656" iyz="0.0" izz="0.000029262"/>
+    </inertial>
+    <visual>
+      <!-- 视觉表示 -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/stl_files/cf_body.stl" scale="1 1 1"/>
+      </geometry>
+    </visual>
+    <collision>
+      <!-- 碰撞模型 -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.10 0.10 0.03"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="crazyflie__imu_link">
+    <inertial>
+      <mass value="0.0"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1e-05" ixy="0" ixz="0" iyy="1e-05" iyz="0" izz="1e-05"/>
+    </inertial>
+  </link>
+
+  <!-- 第一个螺旋桨 -->
+  <link name="m1_prop">
+    <inertial>
+       <mass value="0.0008"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <!-- 惯性张量 -->
+      <inertia ixx="0.00000014" ixy="0" ixz="0" iyy="0.000000167" iyz="0" izz="0.000000168"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/stl_files/ccw_prop.stl" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- 第二个螺旋桨 -->
+  <link name="m2_prop">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.0008"/>
+      <!-- 惯性张量 -->
+      <inertia ixx="0.00000014" ixy="0" ixz="0" iyy="0.000000167" iyz="0" izz="0.000000168"/>
+    </inertial>
+    <visual>
+      <!-- 视觉表示 -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/stl_files/ccw_prop.stl" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- 第三个螺旋桨 -->
+  <link name="m3_prop">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.0008"/>
+      <!-- 惯性张量 -->
+      <inertia ixx="0.00000014" ixy="0" ixz="0" iyy="0.000000167" iyz="0" izz="0.000000168"/>
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/stl_files/cw_prop.stl" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- 第四个螺旋桨 -->
+  <link name="m4_prop">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.0008"/>
+      <!-- 惯性张量 -->
+      <inertia ixx="0.00000014" ixy="0" ixz="0" iyy="0.000000167" iyz="0" izz="0.000000168"/>
+    </inertial>
+    <visual>
+      <!-- 视觉表示 -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/stl_files/cw_prop.stl" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <joint name="crazyflie__imu_joint" type="fixed">
+    <parent link="body"/>
+    <child link="crazyflie__imu_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="0.0" upper="0.0" effort="0.0" velocity="0.0"/>
+  </joint>
+
+<!-- 第一个螺旋桨的关节 -->
+  <joint name="m1_joint" type="continuous">
+    <parent link="body"/>
+    <child link="m1_prop"/>
+    <!-- 关节原点相对于父链接的位置 -->
+    <origin xyz="0.031 -0.031 0.021" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+
+  </joint>
+
+  <!-- 第二个螺旋桨的关节 -->
+  <joint name="m2_joint" type="continuous">
+    <parent link="body"/>
+    <child link="m2_prop"/>
+    <!-- 关节原点相对于父链接的位置 -->
+    <origin xyz="-0.031 0.031 0.021" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+
+
+    <!-- 这里二三的坐标互换就正确了！！！ -->
+
+
+  <!-- 第三个螺旋桨的关节 -->
+  <joint name="m3_joint" type="continuous">
+    <parent link="body"/>
+    <child link="m3_prop"/>
+    <!-- 关节原点相对于父链接的位置 -->
+    <origin xyz="-0.031 -0.031 0.021" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- 第四个螺旋桨的关节 -->
+  <joint name="m4_joint" type="continuous">
+    <parent link="body"/>
+    <child link="m4_prop"/>
+    <!-- 关节原点相对于父链接的位置 -->
+    <origin xyz="0.031 0.031 0.021" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+  
+</robot> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

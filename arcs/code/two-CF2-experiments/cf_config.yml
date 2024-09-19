@@ -1,0 +1,670 @@
+---
+  world:
+    gravity:
+      - 0.0
+      - 0.0
+      - -9.81
+
+  rigid_bodies:
+    export:
+      enabled: true
+      type: "SingleFrameVtk" # Options: AnimationFbx, SingleFrameVtk
+    skeletons:
+      - file_path: "crazyflie.urdf"
+        initial_position:
+          - 0
+          - 0
+          - 0.05
+        initial_rotation:
+          angle_radians: 0.0
+          axis:
+            - 1.0
+            - 0.0
+            - 0.0
+        joint_velocities:
+          m1_joint:
+          - 400
+          m2_joint:
+          - 400
+          m3_joint:
+          - -400
+          m4_joint:
+          - -400
+      - file_path: "floor.urdf"      
+
+  fluid:
+    blocks:
+      max_block_count: 512
+      block_hash_table_size: 1024
+      block_resolution:
+        - 25
+        - 25
+        - 25
+      update_interval: 5
+      need_border_size: 5
+      create_criteria_type: "VorticityMagnitude"
+      low_demand_need_criteria: 100.0
+      high_demand_need_criteria: 200.0
+      create_jacobi_iterations: 10
+      center_target_skeleton_name: "crazyflie"
+      max_distance_to_target: 100.0
+    fluid:
+      unit_length: 0.01
+      unit_time: 0.0001
+      initial_density: 1.225
+      initial_velocity:
+        - 0.0
+        - 0.0
+        - 0.0
+      kinematic_shear_viscosity: 1.8e-5
+    export:
+      enabled: false
+      type: "LimitedRangeVtk" # Options: FullDataVdb, LimitedRangeVtk
+      resolution:
+        - 100
+        - 100
+        - 100
+      down_sample_factor: 0
+      center_target_skeleton_name: "crazyflie"
+
+  coupling:
+    coupling:
+      cache_directory: "sample_cache"
+      target_sample_area_lbm: 0.5
+      sample_seed: 114514
+      pre_sample_multiplier: 10.0
+      estimated_disk_fill_rate: 0.2
+      two_way_coupling: true
+      use_visual: true
+      correct_iterations: 1
+      spread_kernel: "Phi2" # Options: Nearest, Phi2, Phi4Fast
+      block_search_range_size:
+        - 16
+        - 16
+        - 16
+      create_border_size: 5
+      slip_ratio: 0.0
+      boundary_thickness_lbm: 1.0
+      max_velocity_difference_lbm: 0.2
+      exceed_warn_ratio: 0.05
+      search_center_target_skeleton_name: "crazyflie"
+    export:
+      enabled: false
+      type: "Vtk" # Options: Vtk
+
+  virtual_propellers:
+    coupling:
+      target_line_section_width_lbm: 0.2
+      two_way_coupling: true
+      sub_steps: 1
+      spread_kernel: "Phi4Fast" # Options: Nearest, Phi2, Phi4Fast
+      block_search_range_size:
+        - 16
+        - 16
+        - 16
+      create_border_size: 5
+      max_force_lbm: 15.0 # Actually bo limitation
+      search_center_target_skeleton_name: "crazyflie"
+      airfoil_slice_models:
+        - name: "6cm"
+          cl_vs_angle_of_attack:
+            - aoa: -3.14159
+              cl: 0.0
+            - aoa: -3.00197
+              cl: 0.5
+            - aoa: -0.174533 # -10 deg
+              cl: -0.28
+            - aoa: -0.0872665 # -5 deg
+              cl: 0.08
+            - aoa: 0.0 # 0 deg
+              cl: 0.29
+            - aoa: 0.0872665 # 5 deg
+              cl: 1.07
+            - aoa: 0.174533 # 10 deg
+              cl: 1.31
+            - aoa: 0.261799 # 15 deg
+              cl: 0.86
+            - aoa: 0.349066 # 20 deg
+              cl: 1.00
+            - aoa: 2.93215
+              cl: -0.5
+            - aoa: 3.14159
+              cl: 0.0
+          cd_vs_angle_of_attack:
+            - aoa: -3.14159
+              cd: 0.05
+            - aoa: -1.5708
+              cd: 0.5
+            - aoa: -0.174533 # -10 deg
+              cd: 0.161
+            - aoa: -0.0872665 # -5 deg
+              cd: 0.093
+            - aoa: 0.0 # 0 deg
+              cd: 0.068
+            - aoa: 0.0872665 # 5 deg
+              cd: 0.073
+            - aoa: 0.174533 # 10 deg
+              cd: 0.129
+            - aoa: 0.261799 # 15 deg
+              cd: 0.275
+            - aoa: 0.349066 # 20 deg
+              cd: 0.419
+            - aoa: 1.5708
+              cd: 0.5
+            - aoa: 3.14159
+              cd: 0.05
+        - name: "10cm"
+          cl_vs_angle_of_attack:
+            - aoa: -3.14159
+              cl: 0.0
+            - aoa: -3.00197
+              cl: 0.5
+            - aoa: -0.174533 # -10 deg
+              cl: -0.31
+            - aoa: -0.0872665 # -5 deg
+              cl: -0.35
+            - aoa: 0.0 # 0 deg
+              cl: 0.67
+            - aoa: 0.0872665 # 5 deg
+              cl: 1.23
+            - aoa: 0.174533 # 10 deg
+              cl: 1.54
+            - aoa: 0.261799 # 15 deg
+              cl: 1.13
+            - aoa: 0.349066 # 20 deg
+              cl: 1.16
+            - aoa: 2.93215
+              cl: -0.5
+            - aoa: 3.14159
+              cl: 0.0
+          cd_vs_angle_of_attack:
+            - aoa: -3.14159
+              cd: 0.05
+            - aoa: -1.5708
+              cd: 0.5
+            - aoa: -0.174533 # -10 deg
+              cd: 0.113
+            - aoa: -0.0872665 # -5 deg
+              cd: 0.113
+            - aoa: 0.0 # 0 deg
+              cd: 0.50
+            - aoa: 0.0872665 # 5 deg
+              cd: 0.057
+            - aoa: 0.174533 # 10 deg
+              cd: 0.101
+            - aoa: 0.261799 # 15 deg
+              cd: 0.269
+            - aoa: 0.349066 # 20 deg
+              cd: 0.443
+            - aoa: 1.5708
+              cd: 0.5
+            - aoa: 3.14159
+              cd: 0.05
+        - name: "14cm"
+          cl_vs_angle_of_attack:
+            - aoa: -3.14159
+              cl: 0.0
+            - aoa: -3.00197
+              cl: 0.5
+            - aoa: -0.174533 # -10 deg
+              cl: -0.31
+            - aoa: -0.0872665 # -5 deg
+              cl: -0.39
+            - aoa: 0.0 # 0 deg
+              cl: 0.71
+            - aoa: 0.0872665 # 5 deg
+              cl: 1.24
+            - aoa: 0.174533 # 10 deg
+              cl: 1.35
+            - aoa: 0.261799 # 15 deg
+              cl: 1.02
+            - aoa: 0.349066 # 20 deg
+              cl: 1.13
+            - aoa: 2.93215
+              cl: -0.5
+            - aoa: 3.14159
+              cl: 0.0
+          cd_vs_angle_of_attack:
+            - aoa: -3.14159
+              cd: 0.05
+            - aoa: -1.5708
+              cd: 0.5
+            - aoa: -0.174533 # -10 deg
+              cd: 0.159
+            - aoa: -0.0872665 # -5 deg
+              cd: 0.117
+            - aoa: 0.0 # 0 deg
+              cd: 0.046
+            - aoa: 0.0872665 # 5 deg
+              cd: 0.066
+            - aoa: 0.174533 # 10 deg
+              cd: 0.138
+            - aoa: 0.261799 # 15 deg
+              cd: 0.268
+            - aoa: 0.349066 # 20 deg
+              cd: 0.422
+            - aoa: 1.5708
+              cd: 0.5
+            - aoa: 3.14159
+              cd: 0.05
+        - name: "18cm"
+          cl_vs_angle_of_attack:
+            - aoa: -3.14159
+              cl: 0.0
+            - aoa: -3.00197
+              cl: 0.5
+            - aoa: -0.174533 # -10 deg
+              cl: -0.53
+            - aoa: -0.0872665 # -5 deg
+              cl: -0.42
+            - aoa: 0.0 # 0 deg
+              cl: 0.09
+            - aoa: 0.0872665 # 5 deg
+              cl: 0.87
+            - aoa: 0.174533 # 10 deg
+              cl: 0.82
+            - aoa: 0.261799 # 15 deg
+              cl: 0.81
+            - aoa: 0.349066 # 20 deg
+              cl: 0.58
+            - aoa: 2.93215
+              cl: -0.5
+            - aoa: 3.14159
+              cl: 0.0
+          cd_vs_angle_of_attack:
+            - aoa: -3.14159
+              cd: 0.05
+            - aoa: -1.5708
+              cd: 0.5
+            - aoa: -0.174533 # -10 deg
+              cd: 0.178
+            - aoa: -0.0872665 # -5 deg
+              cd: 0.087
+            - aoa: 0.0 # 0 deg
+              cd: 0.041
+            - aoa: 0.0872665 # 5 deg
+              cd: 0.078
+            - aoa: 0.174533 # 10 deg
+              cd: 0.187
+            - aoa: 0.261799 # 15 deg
+              cd: 0.282
+            - aoa: 0.349066 # 20 deg
+              cd: 0.250
+            - aoa: 1.5708
+              cd: 0.5
+            - aoa: 3.14159
+              cd: 0.05
+      blade_models:
+        - name: "crazyflie-blade"
+          length: 0.023
+          airfoil_curve:
+            - r: 0.3077
+              airfoil_model: "6cm"
+            - r: 0.5128
+              airfoil_model: "10cm"
+            - r: 0.7179
+              airfoil_model: "14cm"
+            - r: 0.9231
+              airfoil_model: "18cm"
+          chord_curve:
+            - r: 0.1282 # 2.5cm
+              chord: 0.003
+            - r: 0.6 # 4cm
+              chord: 0.006
+            - r: 0.9846 # 19.2cm
+              chord: 0.006
+          angle_curve:
+            - r: 0.1282 # 2.5cm
+              angle: 0.05811946 # 3.33 deg
+            - r: 0.2051 # 4cm
+              angle: 0.35639623 # 20.42 deg
+            - r: 0.3077 # 6cm
+              angle: 0.32096605 # 18.39 deg
+            - r: 0.4103 # 8cm
+              angle: 0.28605946 # 16.39 deg
+            - r: 0.5128 # 10cm
+              angle: 0.2427753 # 13.91 deg
+            - r: 0.6154 # 12cm
+              angle: 0.2125811 # 12.18 deg
+            - r: 0.7179 # 14cm
+              angle: 0.1855285 # 10.63 deg
+            - r: 0.8205 # 16cm
+              angle: 0.1656317 # 9.49 deg
+            - r: 0.9231 # 18cm
+              angle: 0.1459095 # 8.36 deg
+            - r: 0.9846 # 19.2cm
+              angle: 0.1342158 # 7.69 deg
+      propeller_models:
+        - name: "propeller-cw"
+          blades: 2
+          blade_model: "crazyflie-blade"
+          direction: "Reversed"
+        - name: "propeller-ccw"
+          blades: 2
+          blade_model: "crazyflie-blade"
+          direction: "Forward"
+      configurations:
+        - target_skeleton_name: "crazyflie"
+          target_joint_name: "m1_joint" # front right, forward
+          center_offset: 0.004
+          model: "propeller-ccw"
+        - target_skeleton_name: "crazyflie"
+          target_joint_name: "m2_joint" # back left, forward
+          center_offset: 0.004
+          model: "propeller-ccw"
+        - target_skeleton_name: "crazyflie"
+          target_joint_name: "m4_joint" # front left, reversed
+          center_offset: 0.004
+          model: "propeller-cw"
+        - target_skeleton_name: "crazyflie"
+          target_joint_name: "m3_joint" # back right, reversed
+          center_offset: 0.004
+          model: "propeller-cw"
+    export:
+      enabled: false
+      type: "Vtk" # Options: Vtk
+
+  actuators: # Types: DcMotor, ExternalForce, Follow, Joint
+# 此段代码为第一次正反转正确的情况
+    - type: "DcMotor"
+      name: "fl"
+      target_skeleton_name: "crazyflie"
+      target_joint_name: "m4_joint"
+      model:
+        stall_torque: 0.00055
+        zero_load_rpm: 65000.0   #调这四个 
+      direction: "Reversed" # Options: Forward, Reversed
+
+    - type: "DcMotor"
+      name: "br"
+      target_skeleton_name: "crazyflie"
+      target_joint_name: "m3_joint"
+      model:
+        stall_torque: 0.00055
+        zero_load_rpm: 65000.0 
+      direction: "Reversed" # Options: Forward, Reversed
+
+    - type: "DcMotor"
+      name: "bl"
+      target_skeleton_name: "crazyflie"
+      target_joint_name: "m2_joint"
+      model:
+        stall_torque: 0.00055
+        zero_load_rpm: 65000.0 
+      direction: "Forward" # Options: Forward, Reversed
+
+    - type: "DcMotor"
+      name: "fr"
+      target_skeleton_name: "crazyflie"
+      target_joint_name: "m1_joint"
+      model:
+        stall_torque: 0.00055
+        zero_load_rpm: 65000.0 
+      direction: "Forward" # Options: Forward, Reversed
+
+
+
+
+
+
+#此段代码为第二次正反转的情况
+
+
+
+    # - type: "DcMotor"
+    #   name: "fl"
+    #   target_skeleton_name: "crazyflie"
+    #   target_joint_name: "m2_joint"
+    #   model:
+    #     stall_torque: 0.4
+    #     zero_load_rpm: 18000.0  #调这四个 
+    #   direction: "Forward" # Options: Forward, Reversed
+
+    # - type: "DcMotor"
+    #   name: "br"
+    #   target_skeleton_name: "crazyflie"
+    #   target_joint_name: "m1_joint"
+    #   model:
+    #     stall_torque: 0.4
+    #     zero_load_rpm: 18000.0 
+    #   direction: "Forward" # Options: Forward, Reversed
+
+    # - type: "DcMotor"
+    #   name: "bl"
+    #   target_skeleton_name: "crazyflie"
+    #   target_joint_name: "m3_joint"
+    #   model:
+    #     stall_torque: 0.4
+    #     zero_load_rpm: 18000.0 
+    #   direction: "Reversed" # Options: Forward, Reversed
+
+    # - type: "DcMotor"
+    #   name: "fr"
+    #   target_skeleton_name: "crazyflie"
+    #   target_joint_name: "m4_joint"
+    #   model:
+    #     stall_torque: 0.4
+    #     zero_load_rpm: 18000.0 
+    #   direction: "Reversed" # Options: Forward, Reversed
+
+
+    - type: "Follow"
+      name: "floor_controller"
+      follower_skeleton_name: "floor"
+      followed_target_skeleton_name: "crazyflie"
+      constraint: "Plane"
+      plane_origin:
+        - 0
+        - 0
+        - 0
+      plane_normal:
+        - 0
+        - 0
+        - 1
+    - type: "MulticopterController"
+      name: "controller"
+      imu_name: "imu"
+      fl_motor_name: "fl"
+      fr_motor_name: "fr"
+      bl_motor_name: "bl"
+      br_motor_name: "br"
+      mixer:
+        thrust_to_pwm_power: 1.0
+        yaw_weight: 1.0
+      rate_controller:
+        control_frequency: 500 # 原值为1000.0
+
+        # crazyflie的参数 角速度
+        k_proportional_gain:
+          roll: 4.363
+          pitch: 4.363
+          yaw: 2.094  #1.20
+        k_integral_gain:
+          roll: 8.726
+          pitch: 8.726
+          yaw: 0.2914
+        k_derivative_gain:
+          roll: 0.4363
+          pitch: 0.4363
+          yaw: 0.0
+        integral_limit:
+          roll: 0.581
+          pitch: 0.581
+          yaw: 2.909
+
+
+        #  p600的参数  角速度
+        # k_proportional_gain:
+        #   roll: 0.3
+        #   pitch: 0.3
+        #   yaw: 0.4
+        # k_integral_gain:
+        #   roll: 1.0
+        #   pitch: 1.0
+        #   yaw: 1.0
+        # k_derivative_gain:
+        #   roll: 0.05
+        #   pitch: 0.05
+        #   yaw: 0.0
+        # integral_limit:
+        #   roll: 0.3
+        #   pitch: 0.3
+        #   yaw: 0.3
+
+      
+      attitude_controller:
+        control_frequency: 500 #原值为250.0
+
+        #  crazyflie的参数  姿态
+        proportional_gain:
+          roll: 0.105
+          pitch: 0.105
+          yaw: 0.105   # 不管事
+        integral_gain:
+          roll: 0.05
+          pitch: 0.05
+          yaw: 0.0175
+        derivative_gain:
+          roll: 0.0
+          pitch: 0.0
+          yaw: 0.0
+          # 需要调节
+        max_output_angular_rate:
+          roll: 0.349 #原值为5.0
+          pitch: 0.349 #原值为5.0
+          yaw: 6.2827 #原值为4.0
+
+        #  p600的参数 姿态
+        # proportional_gain:
+        #   roll: 5.0
+        #   pitch: 5.0
+        #   yaw: 4.0
+        # integral_gain:
+        #   roll: 0.0
+        #   pitch: 0.0
+        #   yaw: 0.0
+        # derivative_gain:
+        #   roll: 0.0
+        #   pitch: 0.0
+        #   yaw: 0.0
+        # max_output_angular_rate:
+        #   roll: 5.0
+        #   pitch: 5.0
+        #   yaw: 4.0
+
+
+        yaw_weight: 0.4
+
+
+     
+      position_controller:
+        control_frequency: 100 #原值50.0
+
+         #  crayflie的参数 速度
+        velocity_proportional_gain:
+          - 25
+          - 25
+          - 25
+        velocity_integral_gain:
+          - 1.0
+          - 1.0
+          - 15.0
+        velocity_derivative_gain:
+          - 0
+          - 0
+          - 0
+
+
+         #  p600的参数 速度
+        # velocity_proportional_gain:
+        #   - 1.8
+        #   - 1.8
+        #   - 1.0
+        # velocity_integral_gain:
+        #   - 0.4
+        #   - 0.4
+        #   - 1.0
+        # velocity_derivative_gain:
+        #   - 0.2
+        #   - 0.2
+        #   - 0.4
+
+
+        max_tilt: 0.4363 # 25 degrees 原值为 0.4363 现在是20度 （最大倾斜角）
+        hover_thrust: 0.5625 # 原值为0.45
+        min_thrust: 0.1
+        max_thrust: 0.6
+        horizontal_thrust_margin: 0.6  #安全裕度 大概不管 也ok 原值为
+
+      #  crazyflie的参数，位置
+        position_proportional_gain:
+          - 2.0
+          - 2.0
+          - 2.0
+        position_integral_gain:
+          - 0.0
+          - 0.0
+          - 0.5
+        position_derivative_gain:
+          - 0.0
+          - 0.0
+          - 0.0
+
+        # p600的参数 位置
+        # position_proportional_gain:
+        #   - 1.5
+        #   - 1.5
+        #   - 1.5
+        # position_integral_gain:
+        #   - 0.0
+        #   - 0.0
+        #   - 0.5
+        # position_derivative_gain:
+        #   - 0.0
+        #   - 0.0
+        #   - 0.0
+        #  需要调节
+        max_horizontal_velocity:  1 #原值为12.0
+        max_up_velocity: 1 #原值为3.0
+        max_down_velocity: 1 #原值为1.5
+
+  sensors: # Types: Body, ExternalForce, Joint, JointForce
+    - type: "Blocks"
+      name: "blocks"
+    - type: "Body"
+      name: "imu"
+      target_skeleton_name: "crazyflie"
+      target_body_name: "crazyflie__imu_link"
+      offset:
+        - 0.0
+        - 0.0
+        - 0.0
+      up_axis: "ZPositive"
+      forward_axis: "XPositive"
+    - type: "JointForceTorque"
+      name: "ft"
+      target_skeleton_name: "crazyflie"
+      target_body_name: "connector"
+      averaging_period: 0.01
+
+    - type: "Joint"
+      name: "joint_fl"
+      target_skeleton_name: "crazyflie"
+      target_joint_name: "m2_joint"
+      mode: "Velocity" # Options: Position, Velocity, Acceleration
+    - type: "Joint"
+      name: "joint_br"
+      target_skeleton_name: "crazyflie"
+      target_joint_name: "m1_joint"
+      mode: "Velocity" # Options: Position, Velocity, Acceleration
+    - type: "Joint"
+      name: "joint_bl"
+      target_skeleton_name: "crazyflie"
+      target_joint_name: "m3_joint"
+      mode: "Velocity" # Options: Position, Velocity, Acceleration
+    - type: "Joint"
+      name: "joint_fr"
+      target_skeleton_name: "crazyflie"
+      target_joint_name: "m4_joint"
+      mode: "Velocity" # Options: Position, Velocity, Acceleration
+
