@@ -598,17 +598,17 @@
 
       #  crazyflie的参数，位置
         position_proportional_gain:
-          - 2.0
-          - 2.0
-          - 2.0
+          - 15.0
+          - 15.0
+          - 15.0
         position_integral_gain:
           - 0.0
           - 0.0
           - 0.5
         position_derivative_gain:
-          - 0.0
-          - 0.0
-          - 0.0
+          - 5.0
+          - 5.0
+          - 5.0
 
         # p600的参数 位置
         # position_proportional_gain:

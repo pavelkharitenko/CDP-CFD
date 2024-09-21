@@ -9,15 +9,13 @@ controller = simcontrol2.Controller("localhost", port)
 
 # retrieve px4 actuator index:
 px4_index_1 = controller.get_actuator_info('controller1').index
-
-# retrieve px4 actuator index:
 px4_index_2 = controller.get_actuator_info('controller2').index
 
 # setup IMUs
 # Retrieve imu sensor index (imu is a class of sensor)
 imu1_index = controller.get_sensor_info('imu1').index
-
 imu2_index = controller.get_sensor_info('imu2').index
+force_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_z").index
 
 # set experiment 
 nan = float('NaN')
@@ -25,7 +23,7 @@ nan = float('NaN')
 # Start simulation
 controller.start()
 time_step = controller.get_time_step()  # time_step = 0.0001
-sim_max_duration = 15.0 # sim seconds
+sim_max_duration = 30.0 # sim seconds
 total_sim_steps = sim_max_duration / time_step
 control_frequency = 30.0 # Hz
 # Calculate time steps between one control period
@@ -44,6 +42,8 @@ time_seq = []
 uav_1_pos_list = []
 uav_2_pos_list = []
 
+uav_2_force_z_list = []
+
 # each iteration sends control signal
 while curr_sim_time < sim_max_duration:
 
@@ -55,11 +55,13 @@ while curr_sim_time < sim_max_duration:
     # Create controller input. This is the actuator input vector
 
     # uav 2 flies to right after 2.6 seconds
-    px4_input_1 = (0.0, 0.0, 0.0, 2.1, nan, nan, nan, nan, nan, nan, 0.0, nan) 
-    if curr_sim_time < 5.6:
-        px4_input_2 = (0.0, 0.0, -1.5, 1.5, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+    px4_input_1 = (0.0, 0.0, 0.0, 2.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+    if curr_sim_time < 10.0:
+        #px4_input_2 = (0.0, 0.0, -1.5, 1.5, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+        pass
     else:
-        px4_input_2 = (0.0, 0.0, 1.5, 1.5, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+        #px4_input_2 = (0.0, 0.0, 1.5, 1.5, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+        pass
 
     #px4_input_2 = (0.0, 0.0, -1.5, 1.5, nan, nan, nan, nan, nan, nan, 0.0, nan) 
 
@@ -71,19 +73,27 @@ while curr_sim_time < sim_max_duration:
 
     # Simulate a control period, giving actuator input and retrieving sensor output
     reply = controller.simulate(steps_per_call,  {px4_index_1: px4_input_1, 
-                                                  px4_index_2: px4_input_2})
+                                                  #px4_index_2: px4_input_2
+                                                  })
 
 
     
     # Get imu sensor output (a tuple of floats)
     imu1_data = reply.get_sensor_output(imu1_index)
     imu2_data = reply.get_sensor_output(imu2_index)
+    uav_2_force_z = reply.get_sensor_output(force_sensor_idx)
+
+    print("Z-axis forces on UAV2: ", uav_2_force_z)
 
     # add x,y,z positions of uav 1
     uav_1_pos_list.append((imu1_data[0], imu1_data[1], imu1_data[2]))
 
-    # add x,y,z positions of uav 1
+    # add x,y,z positions of uav 2
     uav_2_pos_list.append((imu2_data[0], imu2_data[1], imu2_data[2]))
+
+    # add z force of uav 2
+    uav_2_force_z_list.append(uav_2_force_z)
+
 
     # advance timer and step counter:
     curr_sim_time += steps_per_call * time_step
@@ -116,5 +126,15 @@ ax1.plot(time_seq, [xyz[2] for xyz in uav_2_pos_list], label='pos_z', color=colo
 #ax1.plot(seq_t, seq_pos_des[0], label='pos_xd', color=color2)
 ax1.tick_params(axis='y', labelcolor=color1)
 ax1.legend()
+
+ax2 = axes[0][1]
+ax2.set_title('Sufferer UAV z-axis forces vs. Time')
+ax2.set_xlabel('time (s)')
+ax2.set_ylabel('Force (N)', color=color1)
+ax2.plot(time_seq, [xyz[0] for xyz in uav_2_force_z_list], label='force_z', color=color2)
+#ax1.plot(seq_t, seq_pos_des[0], label='pos_xd', color=color2)
+ax2.tick_params(axis='y', labelcolor=color1)
+ax2.legend()
+
 
 plt.show()
