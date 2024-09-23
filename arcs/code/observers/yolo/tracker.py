@@ -1,7 +1,6 @@
 import torch, numpy as np
 import torch.nn as nn
 
-print(torch.cuda.is_available())
 
 # YOLO v1:
 
