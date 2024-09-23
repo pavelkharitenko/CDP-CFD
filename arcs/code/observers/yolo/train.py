@@ -122,7 +122,7 @@ def main():
         mean_avg_prec = mean_average_precision(pred_boxes, target_boxes, iou_threshold=0.5, box_format="midpoint")
 
         print(f"Train mAP: {mean_avg_prec}")
-        if mean_avg_prec >0.9:
+        if mean_avg_prec > 0.9:
             checkpoint = {
                 "state_dict": model.state_dict(),
                 "optimizer": optimizer.state_dict()
