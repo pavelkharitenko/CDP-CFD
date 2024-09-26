@@ -90,7 +90,7 @@ def train():
     #print("### value at ", test_sample, "is",model(st))
 
     #plot_xy_slices(model)
-    #plot_3D_forces(model)
+    plot_3D_forces(model)
 
     # setup dataloader
     train_loader = DataLoader(

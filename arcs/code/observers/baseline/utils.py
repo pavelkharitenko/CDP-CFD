@@ -144,29 +144,44 @@ def plot_3D_forces(model):
     xyz_forces = model(input)
     
     # plot result
-    input = input.to("cpu")
+    input = input.to("cpu").detach().numpy()
     xyz_forces = xyz_forces.to("cpu").detach().numpy()
 
+    plot_3d_vectorfield(input, xyz_forces, 1.0, "\n Predicted Downwash Force Vector Field \n (Force length adjusted)")
+    
+    
+
+
+def plot_3d_vectorfield(startpositions, vectors, scale, title):
     # normalize for plotting
-    xyz_forces = xyz_forces / np.linalg.norm(xyz_forces)
+    #vectors = vectors / np.linalg.norm(vectors)
     # iterate over input and output and create 3D plot
 
+    
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     ax.set_xlabel('X') #, linespacing=4)
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+    xs = [xyz[0] for xyz in startpositions]
+    ys = [xyz[1] for xyz in startpositions]
+    zs = [xyz[2] for xyz in startpositions]
+    xmin, xmax = np.min(xs), np.max(xs)
+    ymin, ymax = np.min(ys), np.max(ys)
+    zmin, zmax = np.min(zs), np.max(zs)
 
+    ax.set_xlim([xmin*1.2,xmax*1.2])
+    ax.set_ylim([ymin*1.2,ymax*1.2])
+    ax.set_zlim([zmin*1.2,zmax*1.2])
 
-    for i in range(len(input)):
-        x,y,z = input[i].detach().numpy()[:3]
-        fx,fy,fz =  xyz_forces[i] * 5 # vector length factor for visualization
+    for i in range(len(startpositions)):
+        x,y,z = startpositions[i][:3]
+        fx,fy,fz =  vectors[i] * scale # vector length factor for visualization
         ax.quiver(x, y, z, fx, fy, fz, color='steelblue')
 
-    fig.suptitle('\n Predicted Downwash Force Vector Field \n (Force length adjusted)')
+    fig.suptitle(title)
     plt.show()
-    plt.savefig("3D_DW_dummydata.png")
-    
+    #plt.savefig("3D_DW_dummydata.png")
 
 
 def plot_NN_training(train_errors, val_errors):
