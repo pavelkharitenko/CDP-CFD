@@ -9,7 +9,7 @@ def plot_xy_slices(model):
     """
     
     # Plot xy-slices at different Z-values:
-    xy_plane_z_samples = [-1.0, -0.5, 0.0, 0.5, 1.0,]
+    xy_plane_z_samples = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5]
     xy_range = 1.0 # size of XY plane
     plane_res = 200 # number of points sampled for plotting in one dimension
 
@@ -98,10 +98,10 @@ def plot_xy_slices(model):
     for im in all_imgs:
         im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
 
-    fig.suptitle('Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer \n (trained on dummy data)')
     plt.xlabel('Forces in Newton (N)')
     #plt.ylabel('dummy data')
-    fig.savefig('DW_Predictor_z_y_slices.jpg')
+    fig.savefig('DW_Predictor_z_y_slices.png')
     plt.show()
 
 
@@ -115,7 +115,7 @@ def plot_3D_forces(model):
     
     # Plot xy-slices at different Z-values:
     xy_range = 1.0 # size of XY plane
-    plane_res = 7 # number of points sampled for plotting in one dimension
+    plane_res = 6 # number of points sampled for plotting in one dimension
 
     color="autumn_r"
     test_f = []
@@ -163,7 +163,20 @@ def plot_3D_forces(model):
         fx,fy,fz =  xyz_forces[i] * 5 # vector length factor for visualization
         ax.quiver(x, y, z, fx, fy, fz, color='steelblue')
 
+    fig.suptitle('\n Predicted Downwash Force Vector Field \n (Force length adjusted)')
     plt.show()
+    plt.savefig("3D_DW_dummydata.png")
     
-    
+
+
+def plot_NN_training(train_errors, val_errors):
+    t = range(len(train_errors))
+    plt.plot(t,train_errors)
+    plt.plot(t,val_errors)
+    plt.xlabel("Epoch i")
+    plt.ylabel("Errors")
+    plt.legend()
+    plt.show()
+
+
 
