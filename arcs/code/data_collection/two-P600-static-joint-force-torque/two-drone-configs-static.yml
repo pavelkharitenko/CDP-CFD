@@ -21,13 +21,13 @@
           - 0.0
         joint_velocities:
           p600__rotor_0_joint:
-            - 0.0
+            - 400.0
           p600__rotor_1_joint:
-            - 0.0
+            - 400.0
           p600__rotor_2_joint:
-            - -0.0
+            - -400.0
           p600__rotor_3_joint:
-            - -0.0
+            - -400.0
       - file_path: "p600_2.urdf"
         name: "p600_2"
         initial_position:
