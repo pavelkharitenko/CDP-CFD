@@ -7,6 +7,24 @@ from utils import *
 
 
 
+
+def read_sensor(reply, sensor_idx, indicies=[0]):
+    result = []
+    sensor_tuple_data = reply.get_sensor_output(sensor_idx)
+    for i in indicies:
+        result.append(sensor_tuple_data[i])
+    if len(result) == 1:
+        return result[0]
+    else:
+        return result
+
+
+def read_multiple_sensors(reply, sensor_indicies):
+    result = []
+    for sensor_idx in sensor_indicies:
+        result.append(read_sensor(reply, sensor_idx))
+    return result
+
 # connect to simulators controller
 port = 25556
 controller = simcontrol2.Controller("localhost", port)
@@ -19,15 +37,15 @@ px4_index_1 = controller.get_actuator_info('controller1').index
 imu1_index = controller.get_sensor_info('imu1').index
 imu2_index = controller.get_sensor_info('imu2').index
 
-x_force_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_x").index
-y_force_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_y").index
-z_force_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_z").index
+fx_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_x").index
+fy_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_y").index
+fz_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_z").index
 
 # measure z on the rotors as well:
-z_rotor_1_force_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_1_z").index
-z_rotor_2_force_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_2_z").index
-z_rotor_3_force_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_3_z").index
-z_rotor_4_force_sensor_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_4_z").index
+uav2_r1_z_force_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_1_z").index
+uav2_r2_z_force_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_2_z").index
+uav2_r3_z_force_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_3_z").index
+uav2_r4_z_force_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_4_z").index
 
 
 uav_2_joint_force_torque_idx = controller.get_sensor_info("uav_2_jft_sensor").index
@@ -39,7 +57,7 @@ nan = float('NaN')
 # Start simulation
 controller.start()
 time_step = controller.get_time_step()  # time_step = 0.0001
-sim_max_duration = 1.0 # sim seconds
+sim_max_duration = 15.0 # sim seconds
 total_sim_steps = sim_max_duration / time_step
 control_frequency = 30.0 # Hz
 # Calculate time steps between one control period
@@ -97,70 +115,59 @@ while curr_sim_time < sim_max_duration:
 
     
     # Get imu sensor output (a tuple of floats)
-    imu1_data = reply.get_sensor_output(imu1_index)
-    imu2_data = reply.get_sensor_output(imu2_index)
+    uav1_pos_vel_xyz = read_sensor(reply, imu1_index, [0,1,2,6,7,8])
+    uav2_pos_vel_xyz = read_sensor(reply, imu2_index, [0,1,2,6,7,8])
 
-    uav_2_force_x = reply.get_sensor_output(x_force_sensor_idx)[0]
-    uav_2_force_y = reply.get_sensor_output(y_force_sensor_idx)[0]
-    uav_2_force_z = reply.get_sensor_output(z_force_sensor_idx)[0]
-
-    uav_2_r1_force_z = reply.get_sensor_output(z_rotor_1_force_sensor_idx)[0]
-    uav_2_r2_force_z = reply.get_sensor_output(z_rotor_2_force_sensor_idx)[0]
-    uav_2_r3_force_z = reply.get_sensor_output(z_rotor_3_force_sensor_idx)[0]
-    uav_2_r4_force_z = reply.get_sensor_output(z_rotor_4_force_sensor_idx)[0]
+    uav_2_baselink_xyz_forces = read_multiple_sensors(reply, [fx_sensor_idx, fy_sensor_idx, fz_sensor_idx])
+    uav_2_baselink_z_force = uav_2_baselink_xyz_forces[2]
+    uav_2_rotors_z_forces = read_multiple_sensors(reply, [uav2_r1_z_force_idx, uav2_r2_z_force_idx,
+                                                          uav2_r3_z_force_idx, uav2_r4_z_force_idx])
 
 
     uav_2_body_force = reply.get_sensor_output(uav_2_joint_force_torque_idx)
-
     rounded_body_force = np.round(uav_2_body_force[:3],2)
-    print("Force on UAV 2 fixed joint:", rounded_body_force)
+    uav_2_external_forces_list.append(rounded_body_force)
     
-    uav_2_external_force = np.round((uav_2_force_x, uav_2_force_y, uav_2_force_z),2)
-    print("External forces on UAV2: ", uav_2_external_force)
-
-    uav_2_rotor_forces_sum = np.sum(np.round((uav_2_r1_force_z, uav_2_r2_force_z, 
-                                                uav_2_r3_force_z, uav_2_r4_force_z),2))
-    
-    print("Additional rotor z forces: ", uav_2_rotor_forces_sum)
-
+    uav_2_total_z_force = np.sum(np.append(uav_2_rotors_z_forces, uav_2_baselink_z_force))
+   
     # evaluate both methods:
+    print("Force on UAV 2 fixed joint:", rounded_body_force[2] - 29.77)
+    print("force on UAV 2 external_forces_sensor:", uav_2_total_z_force)
 
     dw_joint_sensor = uav_2_body_force[2] - 29.77
     dw_joint_sensor_readings.append(-dw_joint_sensor)
-    dw_body_sensor = np.sum([uav_2_force_z,uav_2_r1_force_z, uav_2_r2_force_z,
-                             uav_2_r3_force_z, uav_2_r4_force_z])
+    dw_body_sensor = uav_2_total_z_force
     dw_body_sensor_readings.append(dw_body_sensor)
+    print("#######")
+    #print(dw_joint_sensor)
+    #print(dw_body_sensor)
 
 
-    #print("UAV 2 imu reading:", imu1_data)
+    
 
     # add x,y,z positions of uav 1
-    uav_1_pos = np.array([imu1_data[0], imu1_data[1], imu1_data[2]])
-    uav_1_pos_list.append(uav_1_pos)
+    uav_1_pos_list.append(np.array(uav1_pos_vel_xyz))
     # add x,y,z positions of uav 2
-    uav_2_pos = np.array([imu2_data[0], imu2_data[1], imu2_data[2]])
-    uav_2_pos_list.append(uav_2_pos)
+    uav_2_pos_list.append(np.array(uav2_pos_vel_xyz))
+    
     # add z force of uav 2
-    uav_2_external_forces_list.append(uav_2_external_force)
     rel_state_vector = np.round(uav_1_pos_list[-1] - uav_2_pos_list[-1],2)
     print(rel_state_vector)
     rel_state_vector_list.append(rel_state_vector)
-
+    
 
     # advance timer and step counter:
     curr_sim_time += steps_per_call * time_step
     curr_step += steps_per_call
 
 
-# Clear simulator
+# Clear and close simulator
 print("Finished, clearing...")
 controller.clear()
-
-# Close the simulation controller
 controller.close()
 print("Control experiment ended.")
 
-print("Collected ", len(rel_state_vector_list), "samples of data")
+print("Collected ", len(rel_state_vector_list), "samples of data.")
 
 plot_3d_vectorfield(rel_state_vector_list, 
                     uav_2_external_forces_list,
