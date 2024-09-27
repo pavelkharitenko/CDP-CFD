@@ -70,13 +70,6 @@ while curr_sim_time < sim_max_duration:
         px4_input_1 = (0.0, 0.0,-1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
         pass
 
-    #px4_input_2 = (0.0, 0.0, -1.5, 1.5, nan, nan, nan, nan, nan, nan, 0.0, nan) 
-
-    # uav 1  flies over left
-    #if curr_sim_time < 7.6:
-    #    px4_input_1 = (0.0, 0.0, 10.0, 2.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
-    #else:
-    #    px4_input_1 = (0.0, 0.0, 10.0, 2.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
 
     # Simulate a control period, giving actuator input and retrieving sensor output
     reply = controller.simulate(steps_per_call,  {
@@ -84,6 +77,10 @@ while curr_sim_time < sim_max_duration:
                                                   #px4_index_2: px4_input_2
                                                   })
 
+    # Check simulation result
+    if reply.has_error():
+        print('Simulation failed! Terminating control experiement.')
+        break
 
     
     # Get imu sensor output (a tuple of floats)
@@ -153,30 +150,30 @@ ax1.tick_params(axis='y', labelcolor=color1)
 ax1.legend()
 
 ax2 = axes[1][0]
-ax2.set_title('Sufferer UAV z-axis forces vs. Time')
+ax2.set_title('Sufferer UAV x-axis forces vs. Time')
 ax2.set_xlabel('time (s)')
-ax2.set_ylabel('Force (N)', color=color1)
-ax2.plot(time_seq, [xyz[0] for xyz in uav_2_external_forces_list], label='force_z', color=color2)
+ax2.set_ylabel('Force (N)')
+ax2.plot(time_seq, [xyz[0] for xyz in uav_2_external_forces_list], label='force_x', color=color2)
 #ax1.plot(seq_t, seq_pos_des[0], label='pos_xd', color=color2)
-ax2.tick_params(axis='y', labelcolor=color1)
+ax2.tick_params(axis='x', labelcolor=color2)
 ax2.legend()
 
 ax3 = axes[1][1]
 ax3.set_title('Sufferer UAV y-axis forces vs. Time')
 ax3.set_xlabel('time (s)')
-ax3.set_ylabel('Force (N)', color=color1)
+ax3.set_ylabel('Force (N)')
 ax3.plot(time_seq, [xyz[1] for xyz in uav_2_external_forces_list], label='force_y', color=color3)
 #ax3.plot(seq_t, seq_pos_des[0], label='pos_xd', color=color2)
 ax3.tick_params(axis='y', labelcolor=color3)
 ax3.legend()
 
 ax4 = axes[1][2]
-ax4.set_title('Sufferer UAV x-axis forces vs. Time')
+ax4.set_title('Sufferer UAV z-axis forces vs. Time')
 ax4.set_xlabel('time (s)')
-ax4.set_ylabel('Force (N)', color=color1)
-ax4.plot(time_seq, [xyz[2] for xyz in uav_2_external_forces_list], label='force_x', color=color4)
+ax4.set_ylabel('Force (N)')
+ax4.plot(time_seq, [xyz[2] for xyz in uav_2_external_forces_list], label='force_z', color=color4)
 #ax1.plot(seq_t, seq_pos_des[0], label='pos_xd', color=color2)
-ax4.tick_params(axis='x', labelcolor=color4)
+ax4.tick_params(axis='y', labelcolor=color4)
 ax4.legend()
 
 

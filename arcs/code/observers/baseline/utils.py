@@ -170,8 +170,8 @@ def plot_3d_vectorfield(startpositions, vectors, scale, title):
     ymin, ymax = np.min(ys), np.max(ys)
     zmin, zmax = np.min(zs), np.max(zs)
 
-    ax.set_xlim([xmin*1.2,xmax*1.2])
-    ax.set_ylim([ymin*1.2,ymax*1.2])
+    ax.set_xlim([zmin*1.2,zmax*1.2])
+    ax.set_ylim([zmin*1.2,zmax*1.2])
     ax.set_zlim([zmin*1.2,zmax*1.2])
 
     for i in range(len(startpositions)):
