@@ -194,4 +194,103 @@ def plot_NN_training(train_errors, val_errors):
     plt.show()
 
 
+def plot_static_dw_collection(state_sufferer, state_producer, ef_sufferer, jft_sufferer, timestamp_list):
+    fig, axes = plt.subplots(2, 2)
+    color1 = 'tab:red'
+    color2 = 'tab:brown'
+    color3 = 'tab:cyan'
+    color4 = 'tab:pink'
+    color5 = 'tab:olive'
+    color6 = 'tab:purple'
+
+    # Plot Both drones position
+    ax1 = axes[0][0]
+    ax1.set_title('DW Producer & Sufferer Positions in the YZ-Plane')
+    ax1.scatter([xyz[1] for xyz in state_producer], [xyz[2] for xyz in state_producer], label='Producer UAV')
+    ax1.scatter([xyz[1] for xyz in state_sufferer], [xyz[2] for xyz in state_sufferer], label='Sufferer UAV')
+    ax1.set_xlabel('Y-Position (m)')
+    ax1.set_ylabel('Z-Position (m)')
+    ax1.legend()
+    
+    # Plot recorded forces over time
+    ax2 = axes[1][0]
+    ax2.set_title('External Forces on Sufferer UAV, EF and JFT sensors')
+    ax2.set_xlabel('Y-Position (m) of Producer')
+    ax2.set_ylabel('Force (N)')
+    ax2.plot([xyz[1] for xyz in state_producer], [xyz[0] for xyz in jft_sufferer], label='x force (jft)')
+    ax2.plot([xyz[1] for xyz in state_producer], [xyz[1] for xyz in jft_sufferer], label='y force (jft)')
+    ax2.plot([xyz[1] for xyz in state_producer], [xyz[2] for xyz in jft_sufferer], label='z force (jft)')
+    ax2.plot([xyz[1] for xyz in state_sufferer], ef_sufferer, label='z force (ef)')
+    ax2.legend()
+
+    ax3 = axes[0][1]
+    ax3.set_title('DW Producer & Sufferer Positions in the XY-Plane')
+    ax3.scatter([xyz[1] for xyz in state_producer], [xyz[0] for xyz in state_producer], label='Producer UAV')
+    ax3.scatter([xyz[1] for xyz in state_sufferer], [xyz[0] for xyz in state_sufferer], label='Sufferer UAV')
+    ax3.set_xlabel('Y-Position (m)')
+    ax3.set_ylabel('X-Position (m)')
+    ax3.legend()
+
+    
+    ax4 = axes[1][1]
+    ax4.set_title('ExtForce vs JointForTor sensor Z force comparison')
+    ax4.set_xlabel('time (s)')
+    ax4.set_ylabel('Force (N)')
+    ax4.plot(timestamp_list, ef_sufferer, label='ExtForSen', color=color4)
+    ax4.plot(timestamp_list, [xyz[2] for xyz in jft_sufferer], label='JointForTor', color=color5)
+    ax4.legend()
+
+
+def plot_uav_force_statistics(timestamp_list, ef_producer, uav_1_jtf_list, uav_1_total_z_forces):
+    DRONE_TOTAL_MASS = 3.035
+
+    fig, axes = plt.subplots(2, 2)
+    color1 = 'tab:red'
+    color2 = 'tab:brown'
+    color3 = 'tab:cyan'
+    color4 = 'tab:pink'
+    color5 = 'tab:olive'
+    color6 = 'tab:purple'
+
+    
+    ax3 = axes[0][0]
+    ax3.set_title('Producer UAV External Z force on rotor 4')
+    ax3.set_xlabel('time (s)')
+    ax3.set_ylabel('Force (N)')
+    ax3.plot(timestamp_list, [ef[0] for ef in ef_producer], label='body extfor z')
+    ax3.plot(timestamp_list, [ef[1] for ef in ef_producer], label='r1 extfor z')
+    ax3.plot(timestamp_list, [ef[2] for ef in ef_producer], label='r2 extfor z')
+    ax3.plot(timestamp_list, [ef[3] for ef in ef_producer], label='r3 extfor z')
+    ax3.plot(timestamp_list, [ef[4] for ef in ef_producer], label='r4 extfor z')
+    ax3.plot(timestamp_list, [np.sum(ef) for ef in ef_producer], label='sum extfor z')
+
+    ax3.legend()
+    ax3 = axes[1][0]
+
+    ax3.set_title('Producer UAV jft Z forces')
+    ax3.set_xlabel('time (s)')
+    ax3.set_ylabel('Force (N)')
+
+    ax3.plot(timestamp_list, [body_r1_r2_r3_r4[0][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft body z')
+    ax3.plot(timestamp_list, [body_r1_r2_r3_r4[1][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft imu z')
+    ax3.plot(timestamp_list, [-body_r1_r2_r3_r4[2][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft r1 z')
+    ax3.plot(timestamp_list, [-body_r1_r2_r3_r4[3][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft r2 z')
+    ax3.plot(timestamp_list, [-body_r1_r2_r3_r4[4][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft r3 z')
+    ax3.plot(timestamp_list, [-body_r1_r2_r3_r4[5][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft r4 z')
+
+    #fz_fu_diff = np.array([DRONE_TOTAL_MASS * acc_xyz[2]  for acc_xyz in uav1_acc_xyz_list]) 
+    #- np.array([-body_r1_r2_r3_r4[2]  for body_r1_r2_r3_r4 in np.sum(uav_1_jtf_list, axis=1)]) 
+    #summed_z_forces_rotors = np.array([-np.sum(body_r1_r2_r3_r4, axis=0)[2] for body_r1_r2_r3_r4 in uav_1_jtf_list])
+    
+    ax3.plot(timestamp_list, summed_z_forces_rotors, label='jft z in total')
+    ax3.plot(timestamp_list, uav_1_total_z_forces, label='drone actual z force')
+    ax3.plot(timestamp_list, np.array(uav_1_total_z_forces) - summed_z_forces_rotors, label='residual z force')
+
+    ax3.legend()
+
+
+
+
+
+
 

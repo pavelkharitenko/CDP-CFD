@@ -332,7 +332,7 @@
           - 0.0
           - 0.0
           - 1.0
-    # External force sensors for UAV 2 rotors
+    # External force sensors for UAV rotors
     - type: "ExternalForce"
       name: "uav_2_force_sensor_rotor_1_z"
       target_skeleton_name: "p600_2"
@@ -376,12 +376,92 @@
       target_body_name: "p600__base_link"
       averaging_period: 0
 
+    # add uav 1 external force sensors to body and each rotor
     - type: "ExternalForce"
-      name: "uav_1_force_sensor_rotor_4_z"
+      name: "uav_1_force_sensor_body_z"
       target_skeleton_name: "p600"
-      target_body_name: "p600__rotor_3"
-      averaging_period: 10
+      target_body_name: "p600__base_link"
+      averaging_period: 0
       force_axis_local:
           - 0.0
           - 0.0
           - 1.0
+    - type: "ExternalForce"
+      name: "uav_1_force_sensor_rotor_1_z"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_0"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+
+    - type: "ExternalForce"
+      name: "uav_1_force_sensor_rotor_2_z"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_1"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+
+    - type: "ExternalForce"
+      name: "uav_1_force_sensor_rotor_3_z"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_2"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+
+    - type: "ExternalForce"
+      name: "uav_1_force_sensor_rotor_4_z"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_3"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+
+    # add joint force torque sensor to each UAV1 rotor to measure total thrust
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_body"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__base_link"
+      averaging_period: 0
+
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_imu"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__imu_link"
+      averaging_period: 0
+    
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_rotor1"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_0"
+      averaging_period: 0
+
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_rotor2"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_1"
+      averaging_period: 0
+    
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_rotor3"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_2"
+      averaging_period: 0
+
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_rotor4"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_3"
+      averaging_period: 0
+
+
+    

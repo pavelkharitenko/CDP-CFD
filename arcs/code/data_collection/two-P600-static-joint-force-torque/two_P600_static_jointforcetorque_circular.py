@@ -5,8 +5,10 @@ import sys, os
 sys.path.append('../../observers/baseline/')
 from utils import *
 
-SIM_DURATION = 15.0
+SIM_DURATION = 60.0
 
+freq = 0.02
+radius = 3.0
 
 
 def read_sensor(reply, sensor_idx, indicies=[0]):
@@ -48,6 +50,8 @@ uav2_r2_z_force_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_2_z")
 uav2_r3_z_force_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_3_z").index
 uav2_r4_z_force_idx = controller.get_sensor_info("uav_2_force_sensor_rotor_4_z").index
 
+uav1_r4_z_force_idx = controller.get_sensor_info("uav_1_force_sensor_rotor_4_z").index
+
 
 uav_2_joint_force_torque_idx = controller.get_sensor_info("uav_2_jft_sensor").index
 
@@ -83,6 +87,8 @@ dw_joint_sensor_readings = []
 dw_body_sensor_readings = []
 uav_2_jt_forces_list = []  # list of (x,y,z) force tuples 
 
+uav_1_external_force_rotor4 = []
+
 # each iteration sends control signal
 while curr_sim_time < sim_max_duration:
 
@@ -99,8 +105,10 @@ while curr_sim_time < sim_max_duration:
         #px4_input_2 = (0.0, 0.0, -1.5, 1.5, nan, nan, nan, nan, nan, nan, 0.0, nan) 
         pass
     else:
-        px4_input_1 = (0.0, 0.0,-1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
-        pass
+        px = radius * np.sin(2.0 * np.pi * freq * curr_sim_time)
+        py = radius - radius * np.cos(2.0 * np.pi * freq * curr_sim_time)
+        nan = float('NaN')
+        px4_input_1 = (0.0, px, py-1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) # This is the actuator input vector
 
 
     # Simulate a control period, giving actuator input and retrieving sensor output
@@ -108,6 +116,8 @@ while curr_sim_time < sim_max_duration:
                                                    px4_index_1: px4_input_1, 
                                                   #px4_index_2: px4_input_2
                                                   })
+    
+    print("#### Reply", reply)
 
     # Check simulation result
     if reply.has_error():
@@ -134,6 +144,8 @@ while curr_sim_time < sim_max_duration:
                                             -(uav_2_jt_force[2] - 29.77)
                                         ]))
     
+    uav_1_rotor_4_external_force = read_sensor(reply, uav1_r4_z_force_idx)
+    uav_1_external_force_rotor4.append(uav_1_rotor_4_external_force)
     
    
     # evaluate both methods:
@@ -237,5 +249,15 @@ ax3.plot(time_seq, [xyz[1] for xyz in uav_2_jt_forces_list], label='force_y')
 ax3.legend()
 
 
+ax3 = axes[0][2]
+ax3.set_title('Producer UAV External Z force on rotor 4')
+ax3.set_xlabel('time (s)')
+ax3.set_ylabel('Force (N)')
+ax3.plot(time_seq, uav_1_external_force_rotor4, label='r4 force_z')
+#ax3.plot(time_seq, [xyz[1] for xyz in uav_2_jt_forces_list], label='force_y')
+ax3.legend()
+
 
 plt.show()
+
+print("Mean forces on rotor 4",np.mean(uav_1_external_force_rotor4))
