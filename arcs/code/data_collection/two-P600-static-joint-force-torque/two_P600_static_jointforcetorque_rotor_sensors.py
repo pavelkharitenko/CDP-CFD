@@ -7,11 +7,11 @@ from utils import *
 
 port = 25556
 
-SIM_DURATION = 10.0
+SIM_DURATION = 30.0
 
 DRONE_TOTAL_MASS = 3.035 # P600 weight
 
-HOVER_TIME = 10.0
+HOVER_TIME = 30.0
 FLY_CIRCULAR = False
 freq = 0.02
 radius = 3.0
@@ -139,9 +139,12 @@ while curr_sim_time < sim_max_duration:
 
     else:
         if curr_sim_time < HOVER_TIME:
+            #px4_input_1 = (0.0, nan,nan,nan, 0.0, 0.0, 0.0, nan, nan, nan, 0.0, nan) 
             px4_input_1 = (0.0, 0.0, 1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
         else:
-            px4_input_1 = (0.0, 0.0,-1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            # keep position
+            px4_input_1 = (0.0, 0.0, 1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            #px4_input_1 = (0.0, nan,nan,nan, 0.0, 0.0, 0.0, nan, nan, nan, 0.0, nan) 
             
 
 
@@ -199,8 +202,8 @@ while curr_sim_time < sim_max_duration:
 
     # uav 1 body and rotors jft sensors
     uav1_body_r1_r2_r3_r4_jft = read_multiple_sensors(reply, uav_1_jft_sensor_idxs, [0,1,2])
-    uav_1_jtf_list.append(uav1_body_r1_r2_r3_r4_jft)
 
+    uav_1_jtf_list.append(uav1_body_r1_r2_r3_r4_jft)
 
     # add x,y,z positions of uav 1
     uav_1_state_list.append(np.array(uav1_pos_vel_acc_xyz))

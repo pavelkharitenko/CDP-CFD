@@ -280,7 +280,7 @@ def plot_uav_force_statistics(timestamp_list, ef_producer, uav_1_jtf_list, uav_1
 
     #fz_fu_diff = np.array([DRONE_TOTAL_MASS * acc_xyz[2]  for acc_xyz in uav1_acc_xyz_list]) 
     #- np.array([-body_r1_r2_r3_r4[2]  for body_r1_r2_r3_r4 in np.sum(uav_1_jtf_list, axis=1)]) 
-    #summed_z_forces_rotors = np.array([-np.sum(body_r1_r2_r3_r4, axis=0)[2] for body_r1_r2_r3_r4 in uav_1_jtf_list])
+    summed_z_forces_rotors = np.array([-np.sum(body_r1_r2_r3_r4, axis=0)[2] for body_r1_r2_r3_r4 in uav_1_jtf_list])
     
     ax3.plot(timestamp_list, summed_z_forces_rotors, label='jft z in total')
     ax3.plot(timestamp_list, uav_1_total_z_forces, label='drone actual z force')
