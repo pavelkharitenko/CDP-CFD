@@ -1,26 +1,64 @@
 from simcontrol import simcontrol2
+from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
-import sys, os
+import sys, time, randomname, pickle
 sys.path.append('../../observers/baseline/')
 sys.path.append('../../uav/')
 from uav import *
 from utils import *
 
+EXP_SUCCESSFUL = True
+
 port = 25556
-SIM_DURATION = 2.0
+SIM_DURATION = 4.0
 DRONE_TOTAL_MASS = 3.035 # P600 weight
 HOVER_TIME = 30.0
 FLY_CIRCULAR = False
 freq = 0.02
 radius = 3.0
 
+def init_experiment(env_name):  
+    experiment_name = datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "-" + env_name + "-"+ randomname.get_name()
+    print("###############################################")
+    print("#### -- Beginning Experiment '", experiment_name, "' -- ####")
+    return experiment_name
+
+def save_experiment(exp_name, uav_list, success):
+    exp_name += "-" + str(SIM_DURATION) + "sec-" + str(len(uav_list[0].timestamp_list)) + "-ts"
+    
+    if not success:
+        print("#### --- during simulation, an error occured, not saving results of experiment", exp_name)
+        exit(1)
+    else:
+        print("#### Saving experiment", exp_name, "...")
+        
+        exp_obj = {'exp_name': exp_name, 'uav_list': uav_list}
+
+        with open(exp_name + '.p', 'wb') as handle:
+            pickle.dump(exp_obj, handle)
+        time.sleep(4)
+        with open(exp_name + '.p', 'rb') as handle:
+            b = pickle.load(handle)
+
+        print(exp_obj == b)
+
+
+        print("#### Saved.")
+        print("################################")
+
+        print("unpacking " + b["exp_name"])
+        return b["uav_list"][0], b["uav_list"][1]
+
+
+exp_name = init_experiment("ndp-2-P600")
+
+
 # connect to simulators controller
 controller = simcontrol2.Controller("localhost", port)
 
 ext_force_sensors = ["force_sensor_body_z", "force_sensor_rotor_1_z", "force_sensor_rotor_2_z", "force_sensor_rotor_3_z", "force_sensor_rotor_4_z"]
 jft_sensors = ["jft_sensor_body", "jft_sensor_imu",  "jft_sensor_rotor1", "jft_sensor_rotor2", "jft_sensor_rotor3", "jft_sensor_rotor4"]
-
 
 # setup UAVs
 uav_1_ext_z_force_sensors = ["uav_1_" + ext_sen_name for ext_sen_name in ext_force_sensors]
@@ -70,7 +108,7 @@ while curr_sim_time < sim_max_duration:
 
     # log everything at current timestep  first
     time_seq.append(curr_sim_time)
-    print("## Sim time:", np.round(curr_sim_time,3), "/", sim_max_duration, "s",
+    print("#### Sim time:", np.round(curr_sim_time,3), "/", sim_max_duration, "s",
           " ## Sim steps:", curr_step ,"/", total_sim_steps, "steps")
     
     # Create controller input. This is the actuator input vector
@@ -87,8 +125,8 @@ while curr_sim_time < sim_max_duration:
             px4_input_1 = (0.0, px, py-1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) # This is the actuator input vector
 
     else:
-        px4_input_1 = waypoint_after([0.0, 7],[(0,1.5,2),(0,3,2)])
-        px4_input_2 = waypoint_after([0.0, 7],[(0,-1.5,1.5),(3,-1.5,1.5)])
+        px4_input_1 = waypoint_after([0.0, 5],[(0,1.5,2),(0,6,2)])
+        px4_input_2 = waypoint_after([0.0, 5],[(0,-1.5,1.5),(7,-1.5,1.5)])
 
 
     # Simulate a control period, giving actuator input and retrieving sensor output
@@ -102,6 +140,7 @@ while curr_sim_time < sim_max_duration:
     # Check simulation result
     if reply.has_error():
         print('Simulation failed! Terminating control experiement.')
+        EXP_SUCCESSFUL = False
         break
 
     
@@ -124,15 +163,19 @@ while curr_sim_time < sim_max_duration:
 print("Finished, clearing...")
 controller.clear()
 controller.close()
-print("Control experiment ended.")
+print("Control loop ended.")
 
-print("Collected ", len(rel_state_vector_list), "samples of data.")
+
+print("Collected ", len(time_seq), "samples of data.")
+
+plot_uav_statistics([uav_1, uav_2], begin=1.0, end=3.0)
+uav_1.controller, uav_2.controller = None, None
+uav_1, uav_2 = save_experiment(exp_name, [uav_1, uav_2], EXP_SUCCESSFUL)
+
+plot_uav_statistics([uav_1, uav_2], begin=1.0, end=3.0)
 
 #plot_3d_vectorfield(rel_state_vector_list, uav_2_jt_forces_list, 1.0/np.max(np.abs(uav_2_jt_forces_list)), "\n Collected forces")
-
 #plot_uav_force_statistics(uav_1.timestamp_list, uav_1.ext_forces_list, uav_1.jft_forces_list,  [uav_1.mass*state[8] for state in uav_1.states])
-
-plot_uav_statistics([uav_1,uav_2], begin=1.0, end=1.5)
 
 
 plt.show()
