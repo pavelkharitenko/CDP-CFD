@@ -1,4 +1,5 @@
-import torch
+import torch, pickle, randomname
+from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -149,8 +150,6 @@ def plot_3D_forces(model):
 
     plot_3d_vectorfield(input, xyz_forces, 1.0, "\n Predicted Downwash Force Vector Field \n (Force length adjusted)")
     
-    
-
 
 def plot_3d_vectorfield(startpositions, vectors, scale, title):
     # normalize for plotting
@@ -241,56 +240,74 @@ def plot_static_dw_collection(state_sufferer, state_producer, ef_sufferer, jft_s
     ax4.legend()
 
 
-def plot_uav_force_statistics(timestamp_list, ef_producer, uav_1_jtf_list, uav_1_total_z_forces):
-    DRONE_TOTAL_MASS = 3.035
+def init_experiment(env_name):  
+    experiment_name = datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "-" + env_name + "-"+ randomname.get_name()
+    print("###############################################")
+    print("#### -- Beginning Experiment '", experiment_name, "' -- ####")
+    return experiment_name
 
-    fig, axes = plt.subplots(2, 2)
-    color1 = 'tab:red'
-    color2 = 'tab:brown'
-    color3 = 'tab:cyan'
-    color4 = 'tab:pink'
-    color5 = 'tab:olive'
-    color6 = 'tab:purple'
+
+def save_experiment(exp_name, uav_list, success, sim_duration):
+    exp_name += "-" + str(sim_duration) + "sec-" + str(len(uav_list[0].timestamp_list)) + "-ts"
+    
+    if not success:
+        print("#### --- during simulation, an error occured, not saving results of experiment", exp_name)
+        exit(1)
+    else:
+        print("#### Saving experiment", exp_name, "...")
+        
+        exp_obj = {'exp_name': exp_name, 'uav_list': uav_list}
+
+        save_name = exp_name + '.p'
+        with open(save_name, 'wb') as handle:
+            pickle.dump(exp_obj, handle)
+        
+
+        print("#### Saved.")
+        print("################################")
+        return save_name
+
+
+
+        
+
+
+def load_forces_from_dataset(exp_pkl_path):
+    with open(exp_pkl_path, 'rb') as handle:
+            experiment = pickle.load(handle)
+    print("Loaded " + experiment["exp_name"])
+    return experiment
+
+def extract_labeled_dataset_ndp(uav_list):
+    uav_1, uav_2 = uav_list
+    rel_state_list = [rel_state[0:6] for rel_state in np.array(uav_1.states) - np.array(uav_2.states)]
+    #print(uav_2.jft_forces_list)
+
+    # Compute from F_uav = -mg + Fu + bias + Fd     => Fd = F_uav + mg - Fu - bias
+    Fz_total = [uav_2.total_mass * state[8] for state in uav_2.states] # recorded actual uav m*a z-Force
+    Fg = [uav_2.total_mass * 9.81 for state in uav_2.states] # uav gravitational force m*g
+    Fz_u_total = np.array([-np.sum(body_r1_r2_r3_r4, axis=0) for body_r1_r2_r3_r4 in uav_2.jft_forces_list])
+    bias = 4.5 # on average, Fu compentates always more by 5N, so it is not disturbance force
+    
+    print(len(Fz_total))
+    print(len(Fz_u_total))
+    print(len(Fg))
+
+    dw_forces = np.array(Fz_total) + np.array(Fg) - np.array(Fz_u_total)
+    dw_forces -= bias
+
+    dw_force_vectors = np.array([(0,0,dw_force) for dw_force in dw_forces])
+
+    print(dw_force_vectors)
+
+    xy_data = list(zip(rel_state_list, dw_force_vectors))
+    print("data extracted:", xy_data[-6:])
 
     
-    ax3 = axes[0][0]
-    ax3.set_title('Producer UAV External Z force on rotor 4')
-    ax3.set_xlabel('time (s)')
-    ax3.set_ylabel('Force (N)')
-    ax3.plot(timestamp_list, [ef[0] for ef in ef_producer], label='body extfor z')
-    ax3.plot(timestamp_list, [ef[1] for ef in ef_producer], label='r1 extfor z')
-    ax3.plot(timestamp_list, [ef[2] for ef in ef_producer], label='r2 extfor z')
-    ax3.plot(timestamp_list, [ef[3] for ef in ef_producer], label='r3 extfor z')
-    ax3.plot(timestamp_list, [ef[4] for ef in ef_producer], label='r4 extfor z')
-    ax3.plot(timestamp_list, [np.sum(ef) for ef in ef_producer], label='sum extfor z')
-
-    ax3.legend()
-    ax3 = axes[1][0]
-
-    ax3.set_title('Producer UAV jft Z forces')
-    ax3.set_xlabel('time (s)')
-    ax3.set_ylabel('Force (N)')
-
-    ax3.plot(timestamp_list, [body_r1_r2_r3_r4[0][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft body z')
-    ax3.plot(timestamp_list, [body_r1_r2_r3_r4[1][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft imu z')
-    ax3.plot(timestamp_list, [-body_r1_r2_r3_r4[2][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft r1 z')
-    ax3.plot(timestamp_list, [-body_r1_r2_r3_r4[3][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft r2 z')
-    ax3.plot(timestamp_list, [-body_r1_r2_r3_r4[4][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft r3 z')
-    ax3.plot(timestamp_list, [-body_r1_r2_r3_r4[5][2] for body_r1_r2_r3_r4 in uav_1_jtf_list], label='jft r4 z')
-
-    #fz_fu_diff = np.array([DRONE_TOTAL_MASS * acc_xyz[2]  for acc_xyz in uav1_acc_xyz_list]) 
-    #- np.array([-body_r1_r2_r3_r4[2]  for body_r1_r2_r3_r4 in np.sum(uav_1_jtf_list, axis=1)]) 
-    summed_z_forces_rotors = np.array([-np.sum(body_r1_r2_r3_r4, axis=0)[2] for body_r1_r2_r3_r4 in uav_1_jtf_list])
     
-    ax3.plot(timestamp_list, summed_z_forces_rotors, label='jft z in total')
-    ax3.plot(timestamp_list, uav_1_total_z_forces, label='drone actual z force')
-    ax3.plot(timestamp_list, np.array(uav_1_total_z_forces) - summed_z_forces_rotors, label='residual z force')
-
-    ax3.legend()
+    plot_3d_vectorfield(rel_state_list, dw_force_vectors,1.0/np.max(np.abs(dw_force_vectors)), "Created z-force dataset from collected data")
 
 
-
-
-
+    
 
 
