@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<robot name="floor">
+  <link name="world"/>
+
+  <link name="main">
+    <visual>
+      <geometry>
+        <mesh filename="meshes/floor.stl" scale="0.7 0.7 0.7"/>
+      </geometry>
+    </visual>
+
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="20" ixy="0.0" ixz="0.0" iyx="0.0" iyy="20" iyz="0.0" izx="0.0" izy="0.0" izz="20"/>
+    </inertial>
+
+    <collision>
+      <geometry>
+        <box size="5.0 5.0 0.01"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="world_to_main" type="fixed">
+      <parent link="world"/>
+      <child link="main"/>
+      <origin xyz="0 0 0"/>
+  </joint>
+</robot>

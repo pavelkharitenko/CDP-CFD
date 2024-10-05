@@ -1,7 +1,11 @@
-import torch, pickle, randomname
+import torch, pickle, randomname, sys
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy import random as rnd
+
+sys.path.append('../../uav/')
+from uav import *
 
 def plot_xy_slices(model):
     """
@@ -99,11 +103,113 @@ def plot_xy_slices(model):
     for im in all_imgs:
         im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
 
-    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer \n (trained on dummy data)')
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
     plt.xlabel('Forces in Newton (N)')
     #plt.ylabel('dummy data')
-    fig.savefig('DW_Predictor_z_y_slices.png')
+    
     plt.show()
+
+def plot_zy_yx_slices(model):
+    # Plot xy-slices at different Z-values:
+    xy_plane_z_samples = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.1, 1.3, 1.5]
+    xy_range = 1.0 # size of XY plane
+    plane_res = 400 # number of points sampled for plotting in one dimension
+
+    color="autumn"
+    test_f = []
+    fig, ax = plt.subplots(2, len(xy_plane_z_samples), sharex=True, sharey=True, figsize=(6, 6))
+
+    
+    model.eval()
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    
+    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
+
+    all_imgs = [] # save all
+
+    # loop over Z-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 6])
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                sample_matrix[i * plane_res + j, 0] = xy_samples[i]
+                sample_matrix[i * plane_res + j, 1] = xy_samples[j]
+                sample_matrix[i * plane_res + j, 2] = z_point
+        
+        
+        sample_tensor = torch.from_numpy(sample_matrix).to(torch.float32)
+        input = torch.autograd.Variable(sample_tensor).cuda()
+        output = model(input)
+        test_f.append(output)
+        zs = output[:, 2]
+        
+        # add all encountered z-forces and save them for evaluating 
+        plotted_forces.extend(zs.detach().cpu().numpy())
+
+
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                plot_f[i, j] = zs[i * plane_res + j]
+
+        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[0][idx].set_title(f"Z = {z_point}m")
+        
+    
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    # plot xz-slice
+
+    for k, test_y in enumerate(xy_plane_z_samples):
+        
+        test_xz = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        test_matrix = np.zeros([plane_res**2, 6])
+        # matrix actually (y,x,z) of state vector:
+        for i in range(plane_res):
+            for j in range(plane_res):
+                test_matrix[i * plane_res + j, 0] = test_y
+                test_matrix[i * plane_res + j, 1] = test_xz[i]
+                test_matrix[i * plane_res + j, 2] = test_xz[j]
+        
+        
+        torch_matrix = torch.from_numpy(test_matrix).to(torch.float32)
+        input = torch.autograd.Variable(torch_matrix).cuda()
+        output = model(input)
+        test_f.append(output)
+        ys = output[:, 2]
+        
+        plotted_forces.extend(ys.detach().cpu().numpy())
+
+        plot_f = np.zeros((plane_res, plane_res))
+        for i in range(plane_res):
+            for j in range(plane_res):
+                plot_f[i, j] = ys[i * plane_res + j]
+
+        im = ax[1][k].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color,
+                             origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[1][k].set_title(f"Y = {test_y}m")
+
+    # add the bar and fix min-max colormap
+    for im in all_imgs:
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    plt.xlabel('Forces in Newton (N)')
+    #plt.ylabel('dummy data')
+    
+    plt.show()
+
+
+
 
 
 
@@ -115,8 +221,8 @@ def plot_3D_forces(model):
     """
     
     # Plot xy-slices at different Z-values:
-    xy_range = 1.0 # size of XY plane
-    plane_res = 6 # number of points sampled for plotting in one dimension
+    xy_range = 2.0 # size of XY plane
+    plane_res = 5 # number of points sampled for plotting in one dimension
 
     color="autumn_r"
     test_f = []
@@ -148,7 +254,7 @@ def plot_3D_forces(model):
     input = input.to("cpu").detach().numpy()
     xyz_forces = xyz_forces.to("cpu").detach().numpy()
 
-    plot_3d_vectorfield(input, xyz_forces, 1.0, "\n Predicted Downwash Force Vector Field \n (Force length adjusted)")
+    plot_3d_vectorfield(input, xyz_forces, 1.0/np.max(np.abs(xyz_forces)), "\n Predicted Downwash Force Vector Field \n (Force length adjusted)")
     
 
 def plot_3d_vectorfield(startpositions, vectors, scale, title):
@@ -185,8 +291,8 @@ def plot_3d_vectorfield(startpositions, vectors, scale, title):
 
 def plot_NN_training(train_errors, val_errors):
     t = range(len(train_errors))
-    plt.plot(t,train_errors)
-    plt.plot(t,val_errors)
+    plt.plot(t,train_errors, label='training error')
+    plt.plot(t,val_errors, label='validation error')
     plt.xlabel("Epoch i")
     plt.ylabel("Errors")
     plt.legend()
@@ -267,9 +373,7 @@ def save_experiment(exp_name, uav_list, success, sim_duration):
         print("################################")
         return save_name
 
-
-
-        
+      
 
 
 def load_forces_from_dataset(exp_pkl_path):
@@ -280,6 +384,7 @@ def load_forces_from_dataset(exp_pkl_path):
 
 def extract_labeled_dataset_ndp(uav_list):
     uav_1, uav_2 = uav_list
+    title = f"\n (relative from {uav_2.name}'s view: rel_state = {uav_1.name} -  {uav_2.name})"
     rel_state_list = [rel_state[0:6] for rel_state in np.array(uav_1.states) - np.array(uav_2.states)]
     #print(uav_2.jft_forces_list)
 
@@ -289,25 +394,78 @@ def extract_labeled_dataset_ndp(uav_list):
     Fz_u_total = np.array([-np.sum(body_r1_r2_r3_r4, axis=0) for body_r1_r2_r3_r4 in uav_2.jft_forces_list])
     bias = 4.5 # on average, Fu compentates always more by 5N, so it is not disturbance force
     
-    print(len(Fz_total))
-    print(len(Fz_u_total))
-    print(len(Fg))
+    #print(len(Fz_total))
+    #print(len(Fz_u_total))
+    #print(len(Fg))
 
     dw_forces = np.array(Fz_total) + np.array(Fg) - np.array(Fz_u_total)
     dw_forces -= bias
 
     dw_force_vectors = np.array([(0,0,dw_force) for dw_force in dw_forces])
 
-    print(dw_force_vectors)
+    #print(dw_force_vectors)
 
     xy_data = list(zip(rel_state_list, dw_force_vectors))
-    print("data extracted:", xy_data[-6:])
+    #print("data extracted:", xy_data[-2200:-2000])
+    print("positive data", [pos_data for pos_data in xy_data if pos_data[0][2]<-1.0])
 
     
     
-    plot_3d_vectorfield(rel_state_list, dw_force_vectors,1.0/np.max(np.abs(dw_force_vectors)), "Created z-force dataset from collected data")
+    plot_3d_vectorfield(rel_state_list[0::20], dw_force_vectors[0::20], 
+                         1.0/np.max(np.abs(dw_force_vectors)), 
+                        "Created z-force dataset from collected data" + title)
+    
+    #return X, Y
+    return rel_state_list, dw_force_vectors
 
 
     
+def plan_next_coords(sample_distance, safety_distance, self_pos, other_uav_pos):
+    xmax, xmin = other_uav_pos[0] + sample_distance, other_uav_pos[0] - sample_distance
+    ymax, ymin = other_uav_pos[1] + sample_distance, other_uav_pos[1] - sample_distance
+    zmax, zmin = other_uav_pos[2] + sample_distance, other_uav_pos[2] - sample_distance
+
+    #print("minmax", xmax, xmin)
+    #print("minmax", ymax, ymin)
+    #print("minmax", zmax, zmin)
+
+    xmax_safety, xmin_safety = other_uav_pos[0] + safety_distance, other_uav_pos[0] - safety_distance
+    ymax_safety, ymin_safety = other_uav_pos[1] + safety_distance, other_uav_pos[1] - safety_distance
+    zmax_safety, zmin_safety = other_uav_pos[2] + safety_distance, other_uav_pos[2] - safety_distance
+
+    #print("minmax safety", xmax_safety, xmin_safety)
+    #print("minmax safety", ymax_safety, ymin_safety)
+    #print("minmax safety", zmax_safety, zmin_safety)
+
+    curr_x, curr_y, curr_z = self_pos
+
+    while True:
+        new_x, new_y, new_z = rnd.uniform(xmin, xmax), rnd.uniform(ymin, ymax), rnd.uniform(zmin, zmax)
+        next_coords = rnd.choice(['xy','xz','yz'])
+
+        if next_coords == 'xy':
+            if zmax_safety >= curr_z and curr_z >= zmin_safety:
+                continue 
+            else:
+                return new_x, new_y, curr_z
+        
+        if next_coords == 'xz':
+            if ymax_safety >= curr_y and curr_y >= ymin_safety:
+                continue 
+            else:
+                return new_x, curr_y, new_z
+        
+        if next_coords == 'yz':
+            if xmax_safety >= curr_x and curr_x >= xmin_safety:
+                continue 
+            else:
+                return curr_x, new_y, new_z
+    
+
+
+
+
+
+
 
 

@@ -66,7 +66,7 @@ class UAV():
         sensor_tuple_data = reply.get_sensor_output(sensor_idx)
 
         for i in indicies:
-            #print("sensor tuple of ", sensor_idx, sensor_tuple_data)
+            #print("### sensor tuple of ", sensor_idx, sensor_tuple_data)
             result.append(sensor_tuple_data[i])
         if len(result) == 1:
             return result[0]
@@ -93,7 +93,7 @@ class UAV():
 
 
 
-def plot_uav_statistics(uav_list, begin=None, end=None):
+def plot_uav_statistics(uav_list, begin=None, end=None, mounted_jft_meas=[]):
     
     
 
@@ -106,6 +106,8 @@ def plot_uav_statistics(uav_list, begin=None, end=None):
         ext_forces_list = np.array(uav.ext_forces_list)
         jft_forces_list = np.array(uav.jft_forces_list)
         states = np.array(uav.states)
+        if len(mounted_jft_meas) != 0:
+            mounted_jft_meas = np.array(mounted_jft_meas)
 
         if begin:
             filter_condition = (timestamp_list> begin) & (timestamp_list < end)
@@ -113,6 +115,9 @@ def plot_uav_statistics(uav_list, begin=None, end=None):
             ext_forces_list = ext_forces_list[filter_condition]
             jft_forces_list = jft_forces_list[filter_condition]
             states = states[filter_condition]
+
+            if len(mounted_jft_meas) != 0:
+                mounted_jft_meas = mounted_jft_meas[filter_condition]
 
 
         # plot ef forces
@@ -142,16 +147,20 @@ def plot_uav_statistics(uav_list, begin=None, end=None):
         jft_ax.set_title("Z-axis JFT-sensor Measurments of '" + uav.name +  "' UAV")
         jft_ax.set_xlabel('time (s)')
         jft_ax.set_ylabel('Force (N)')
-        jft_ax.plot(timestamp_list, [body_r1_r2_r3_r4[0] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis body')
-        jft_ax.plot(timestamp_list, [body_r1_r2_r3_r4[1] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis imu')
+        #jft_ax.plot(timestamp_list, [body_r1_r2_r3_r4[0] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis body')
+        #jft_ax.plot(timestamp_list, [body_r1_r2_r3_r4[1] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis imu')
         jft_ax.plot(timestamp_list, [-body_r1_r2_r3_r4[2] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis r1')
         jft_ax.plot(timestamp_list, [-body_r1_r2_r3_r4[3] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis r2')
         jft_ax.plot(timestamp_list, [-body_r1_r2_r3_r4[4] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis r3')
         jft_ax.plot(timestamp_list, [-body_r1_r2_r3_r4[5] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis r4')
+        
+        if len(mounted_jft_meas) != 0:
+            jft_ax.plot(timestamp_list, mounted_jft_meas, label='mntd. jft sensor')
+
         jft_ax.plot(timestamp_list, summed_z_forces_rotors, label='jft z in total')
-        jft_ax.plot(timestamp_list, uav_actual_z_forces, label='real z force (mass x z-acc)')
+        jft_ax.plot(timestamp_list, uav_actual_z_forces, label='real z-frc. (m*z-acc)')
         jft_ax.plot(timestamp_list, residual_z_forces, label='mass x gravity')
-        jft_ax.plot(timestamp_list, residual_z_forces, label='residual z-force (ma-jft)')
+        jft_ax.plot(timestamp_list, residual_z_forces, label='res. z-force (ma-jft)')
         jft_ax.legend()
 
         # plot statistics
@@ -161,15 +170,23 @@ def plot_uav_statistics(uav_list, begin=None, end=None):
         mean_real_thrust_difference = np.mean(residual_z_forces)
         mean_thrust_mg_difference = np.mean(jft_gravity_force_difference)
         stats = [mean_ef, mean_thrust, mean_real_thrust_difference, mean_thrust_mg_difference]
-        stats = [np.round(stat,2) for stat in stats]
-        statistics.append(stats)
         column_names = ("Avg. total ext. forces", "Avg. thrust of all rotors", 
                         "Avg. diff. real z-frc. - jft", "Avg. diff. jft - M*g")
         
+        if len(mounted_jft_meas) != 0:
+            column_names = ("Avg. extfor", "Avg. thrust", 
+                        "Avg. real z-frc. - jft", "Avg. jft - M*g",
+                        "Avg. real z-frc - mtd. jft")
+            mean_real_thrust_mounted_jft = np.mean(uav_actual_z_forces - mounted_jft_meas)
+            stats.append(mean_real_thrust_mounted_jft)
+            
+        
+        stats = [np.round(stat,2) for stat in stats]
+        statistics.append(stats)
         table_ax = axes[2][i]
         table_ax.axis('tight')
         table_ax.axis('off')
-        stat_table = table_ax.table(cellText=statistics,colLabels=column_names,loc='center')
+        stat_table = table_ax.table(cellText=statistics,colLabels=column_names, loc='center')
         stat_table.auto_set_font_size(False)
         stat_table.set_fontsize(8)
         

@@ -105,7 +105,6 @@ while curr_sim_time < sim_max_duration:
     # read sensors of uavs
     uav_1.update(reply, curr_sim_time)
     uav_2.update(reply, curr_sim_time)
-
     
     rel_state_vector_uav_2 = np.round(np.array(uav_1.states[-1]) - np.array(uav_2.states[-1]), 2)
     #print(rel_state_vector)
