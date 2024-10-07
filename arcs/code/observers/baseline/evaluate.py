@@ -6,7 +6,7 @@ from dataset import DWDataset
 import numpy as np
 
 import matplotlib.pyplot as plt
-from utils import *
+from arcs.code.utils.utils import *
 
 sys.path.append('../../../../../notify/')
 from notify_script_end import notify_ending

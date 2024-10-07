@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from utils import *
+from arcs.code.utils.utils import *
 
 class DWDataset(torch.utils.data.Dataset):
     def __init__(self, experiment_path, shuffle=False):

@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 import matplotlib.pyplot as plt
-from utils import *
+from arcs.code.utils.utils import *
 
 sys.path.append('../../../../../notify/')
 from notify_script_end import notify_ending

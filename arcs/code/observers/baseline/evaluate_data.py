@@ -7,10 +7,12 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 import matplotlib.pyplot as plt
-from utils import *
+sys.path.append('../../uav/')
+from uav import *
+from arcs.code.utils.utils import *
 
 dataset = DWDataset(
-    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-05-20-26-07-NDP-2-P600-coffee-stream-intermediate-savingsec-15000-ts.p"
+    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-06-15-44-22-ndp-2-P600-forgiving-parameter-intermediate-savingsec-35000-ts.p"
     )
 
 

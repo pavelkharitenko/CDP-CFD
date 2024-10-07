@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 
 class UAV():
-    def __init__(self,uav_name, controller, controller_name, imu_name, external_force_sensors_names, joint_force_torque_sensor_names):
+    def __init__(self,uav_name, controller, controller_name, imu_name, external_force_sensors_names, joint_force_torque_sensor_names, mounted_jft_sensor=None):
         # init properties
         self.total_mass = 3.3035
         self.name = uav_name
@@ -17,6 +17,8 @@ class UAV():
         self.jft_forces_list = []
         self.ext_forces_list = []
         self.timestamp_list = []
+        self.mounted_jft_sensor = mounted_jft_sensor
+        self.mounted_jft_sensor_list = []
         # init sensors
         self.init_sensors()
 
@@ -26,6 +28,8 @@ class UAV():
         self.imu_idx = self.get_sensor_idx(self.imu_name)
         self.ef_sensor_idxs = self.get_sensor_idx(self.ef_sensor_names)
         self.jtf_sensor_idxs = self.get_sensor_idx(self.jft_sensor_names)
+        if self.mounted_jft_sensor:
+            self.mounted_jft_sensor_idx = self.get_sensor_idx(self.mounted_jft_sensor)
         
     def update(self, reply, timestep):
         self.reply = reply
@@ -39,6 +43,10 @@ class UAV():
         body_r1_r2_r3_r4_jft = self.read_multiple_sensors(reply, self.jtf_sensor_idxs, [2])
         self.jft_forces_list.append(body_r1_r2_r3_r4_jft)
 
+        # update mounted jft sensor if available
+        if self.mounted_jft_sensor:
+            self.mounted_jft_sensor_list.append(self.read_sensor(reply, self.mounted_jft_sensor_idx, [0,1,2,3,4,5]))
+            #print("### ### stored mtd sensor:", self.mounted_jft_sensor_list[-1][2])
         # update current time
         self.timestamp_list.append(timestep)
 
@@ -93,7 +101,7 @@ class UAV():
 
 
 
-def plot_uav_statistics(uav_list, begin=None, end=None, mounted_jft_meas=[]):
+def plot_uav_statistics(uav_list, begin=None, end=None):
     
     
 
@@ -106,8 +114,8 @@ def plot_uav_statistics(uav_list, begin=None, end=None, mounted_jft_meas=[]):
         ext_forces_list = np.array(uav.ext_forces_list)
         jft_forces_list = np.array(uav.jft_forces_list)
         states = np.array(uav.states)
-        if len(mounted_jft_meas) != 0:
-            mounted_jft_meas = np.array(mounted_jft_meas)
+        if uav.mounted_jft_sensor:
+            mounted_jft_meas = np.array([-sensor_tuple[2] for sensor_tuple in uav.mounted_jft_sensor_list])
 
         if begin:
             filter_condition = (timestamp_list> begin) & (timestamp_list < end)
@@ -116,7 +124,7 @@ def plot_uav_statistics(uav_list, begin=None, end=None, mounted_jft_meas=[]):
             jft_forces_list = jft_forces_list[filter_condition]
             states = states[filter_condition]
 
-            if len(mounted_jft_meas) != 0:
+            if uav.mounted_jft_sensor:
                 mounted_jft_meas = mounted_jft_meas[filter_condition]
 
 
@@ -154,7 +162,7 @@ def plot_uav_statistics(uav_list, begin=None, end=None, mounted_jft_meas=[]):
         jft_ax.plot(timestamp_list, [-body_r1_r2_r3_r4[4] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis r3')
         jft_ax.plot(timestamp_list, [-body_r1_r2_r3_r4[5] for body_r1_r2_r3_r4 in jft_forces_list], label='z-axis r4')
         
-        if len(mounted_jft_meas) != 0:
+        if uav.mounted_jft_sensor:
             jft_ax.plot(timestamp_list, mounted_jft_meas, label='mntd. jft sensor')
 
         jft_ax.plot(timestamp_list, summed_z_forces_rotors, label='jft z in total')
@@ -173,7 +181,7 @@ def plot_uav_statistics(uav_list, begin=None, end=None, mounted_jft_meas=[]):
         column_names = ("Avg. total ext. forces", "Avg. thrust of all rotors", 
                         "Avg. diff. real z-frc. - jft", "Avg. diff. jft - M*g")
         
-        if len(mounted_jft_meas) != 0:
+        if uav.mounted_jft_sensor:
             column_names = ("Avg. extfor", "Avg. thrust", 
                         "Avg. real z-frc. - jft", "Avg. jft - M*g",
                         "Avg. real z-frc - mtd. jft")
