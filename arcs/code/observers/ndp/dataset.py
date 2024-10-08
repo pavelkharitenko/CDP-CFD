@@ -20,16 +20,23 @@ class DWDataset(torch.utils.data.Dataset):
         for exp_path in self.exp_paths:
             exp = load_forces_from_dataset(exp_path)
             uav_1, uav_2 = exp['uav_list']
-            x_i, y_i = extract_labeled_dataset_ndp([uav_1, uav_2], exp['bias'])
+            if "bias" in exp:
+                x_i, y_i = extract_labeled_dataset_ndp([uav_1, uav_2], exp['bias'])
+            else:
+                x_i, y_i = extract_labeled_dataset_ndp([uav_1, uav_2])
+
+            #print("### Max value rec.:", np.max([np.abs(y_i_j[2]) for y_i_j in y_i]))
+            #print("### Max value rec.:", y_i[-4000:-3990])
+
             x.extend(x_i)
             y.extend(y_i)
-            print("######################")
+            #print("######################")
 
-            print("######### x sample:", x[:5])
-            print("######### y sample:", y[:5])
+            #print("######### x sample:", x[:5])
+            #print("######### y sample:", y[:5])
 
-            print("extracted new data of lenghts:", len(x))
-            print("extracted new data of lenghts:", len(y))
+        print("extracted total data of lenghts:", len(x))
+        print("extracted total data of lenghts:", len(y))
 
             
             

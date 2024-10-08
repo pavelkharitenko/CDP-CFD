@@ -15,7 +15,10 @@ from utils import *
 
 dataset = DWDataset([
     #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-06-15-44-22-ndp-2-P600-forgiving-parameter-intermediate-savingsec-35000-ts.p",
-    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-06-23-05-33-ndp-2-P600-low-frigid-dust-intermediate-savingsec-20-ts.p"
+    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-06-17-41-31-ndp-2-P600-wan-osprey-intermediate-savingsec-30000-ts.p",
+    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-07-10-23-45-ndp-2-P600-low-dry-data-intermediate-savingsec-30000-ts.p",
+    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-07-14-10-34-ndp-2-P600-mid-atomic-brass-intermediate-savingsec-35000-ts.p",
+    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-07-19-48-28-Dataset-NDP-2-P600-extremal-tempo-577.0sec-28851-ts.p"
     ])
 
 

@@ -4,6 +4,7 @@ import keyboard
 import numpy as np
 import matplotlib.pyplot as plt
 import sys, time, randomname, pickle
+from numpy import random as rnd
 
 sys.path.append('../../uav/')
 sys.path.append('../../utils/')
@@ -14,12 +15,10 @@ from utils import *
 SAVE_EXP = True
 
 port = 25556
-SIM_DURATION = .4
+SIM_DURATION = 600.00
 DRONE_TOTAL_MASS = 3.035 # P600 weight
 
 
-freq = 0.2
-radius = .4
 nan = float('NaN')
 
 sys.path.append('../../../../../notify/')
@@ -87,7 +86,7 @@ uav_2_jft_sensors = ["uav_2_" + ext_sen_name for ext_sen_name in jft_sensors]
 uav_1 = UAV("producer", controller, "controller1", "imu1", uav_1_ext_z_force_sensors, uav_1_jft_sensors)
 uav_2 = UAV("sufferer", controller, "uav_2_r1_joint_motor", "imu2", uav_2_ext_z_force_sensors, uav_2_jft_sensors, "uav_2_jft_sensor")
 
-uav_1_dest = (0,0,1)
+uav_1_dest = (0,0,0)
 uav_2_dest = (0,0,0)
 
 # Start simulation
@@ -108,7 +107,8 @@ curr_step = 0
 time_seq = []
 rel_state_vector_list = []
 mounted_jft_sensor_list = []
-uav_1_z_pos = 1.0
+uav_1_z_pos = -.2
+radius = 0.5
 
 def waypoint_after(timepoints, waypoints):
     next_goal = None
@@ -128,18 +128,20 @@ while curr_sim_time < sim_max_duration:
     
 
 
-    # fly to 0,1,1 until 4 sec, fly to 0,0,1 until 7 seconds
-    px4_input_1 = waypoint_after([0,3,6], [(0,1,-1),(0,0,-1), uav_1_dest])
-
+    freq = 0.5
     
-    # after 7 seconds, sample new waypoint every 3.0 seconds
-    if curr_sim_time >= 6.0 and np.round(curr_sim_time,3) % 3.0 == 0.0:
-            uav_1_dest = sample_next_coords(-1.5,0.9, -0.45, uav_2_dest)
-            print("########################### \nSetting new UAV 1 destination:", uav_1_dest)
+    px = radius * np.sin(2.0 * np.pi * freq * curr_sim_time)
+    py = radius * np.cos(2.0 * np.pi * freq * curr_sim_time) 
+    nan = float('NaN')
+    px4_input_1 = (0.0, px, py, uav_1_z_pos, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+    print(px4_input_1)
+    if np.round(curr_sim_time,3) % 3 == 0:
+        uav_1_z_pos = rnd.uniform(-0.3, -0.1)
+        radius =  rnd.uniform(0.5, 1)
 
 
     # save uavs states every n seconds
-    if np.round(curr_sim_time,3) % .1 == 0.0 and np.round(curr_sim_time,3) >= .1:
+    if np.round(curr_sim_time,3) % 50.0 == 0.0 and np.round(curr_sim_time,3) >= 1.0:
         if SAVE_EXP:
             uav_1.controller, uav_2.controller = None, None
             exp_path = save_experiment(exp_name, [uav_1, uav_2], EXP_SUCCESSFUL, "intermediate-saving", bias=29.77)

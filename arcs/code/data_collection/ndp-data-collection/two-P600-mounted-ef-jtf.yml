@@ -11,8 +11,8 @@
         name: "p600"
         initial_position:
         - 0
-        - 1.5
-        - -1
+        - -0.5
+        - -0.3
         initial_rotation:
           angle_radians: 0.0
           axis:
@@ -60,7 +60,7 @@
       max_block_count: 170
     fluid:
       resolution: 0.05
-      max_velocity: 80.0
+      max_velocity: 50.0
       initial_density: 1.225
       initial_velocity:
         - 0.0

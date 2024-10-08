@@ -19,21 +19,22 @@ from notify_script_end import notify_ending
 
 SAVE_MODEL = True
 
-#load_model = r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-05-22-59-25-ndp-model-brilliant-vendor20000_eps.pth"
+#load_model = r"2024-10-07-15-58-03-NDP-Li-Model-sn_scale-None-chocolaty-line20000_eps.pth"
 load_model = None
 
 seed = 0
 torch.manual_seed(seed)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 20000
-save_and_evaluate_m_epochs = 4000
+n_epochs = 40000
+save_and_evaluate_m_epochs = 10000
 lr = 1e-4
 #sn_gamma = 4 # scale factor for spectral normalization
-sn_gamma = None
+sn_gamma = 6
  
 def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimizer, loss_fn):
 
     model.train()
+    
     
 
     # get batch (x,y)
@@ -57,7 +58,7 @@ def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimize
 
     # spectral normalization if provided:
     if sn_gamma:
-        for param in net.parameters():
+        for param in model.parameters():
             weights = param.detach()
             if weights.ndim > 1:
                 spec_norm = torch.linalg.norm(weights, 2)
@@ -87,11 +88,15 @@ def train():
     # list of tuples: ([px,py,pz, vx,vy,vz], [fx,fy,fz]) 
     # other vehicle - ego vehicle: [0,0,1]->[0,0,-6.5]
 
-    exp_name = init_experiment(f"NDP-Li-Model-sn_scale-{sn_gamma}")
+    exp_name = init_experiment(f"NDP-Li-Model-sn_scale-{str(sn_gamma)}")
 
-    dataset = DWDataset(
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-06-15-44-22-ndp-2-P600-forgiving-parameter-intermediate-savingsec-35000-ts.p"
-    )
+    dataset = DWDataset([
+    r"datasets\2024-10-06-15-44-22-ndp-2-P600-forgiving-parameter-intermediate-savingsec-35000-ts.p",
+    r"datasets\2024-10-06-17-41-31-ndp-2-P600-wan-osprey-intermediate-savingsec-30000-ts.p",
+    r"datasets\2024-10-07-10-23-45-ndp-2-P600-low-dry-data-intermediate-savingsec-30000-ts.p",
+    r"datasets\2024-10-07-14-10-34-ndp-2-P600-mid-atomic-brass-intermediate-savingsec-35000-ts.p",
+    ])
+
 
     x_train, x_val, y_train, y_val = train_test_split(dataset.x, dataset.y, train_size=0.75, test_size=0.25,
                                                       shuffle=True)
