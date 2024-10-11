@@ -1,17 +1,12 @@
 #----------------------------------
-# NDP model implemented from Li et al. Nonlinear MPC for Quadrotors in Close-Proximity 
-# Flight with Neural Network Downwash Prediction, arXiv:2304.07794v2
-# Their implementation found at https://github.com/Li-Jinjie/ndp_nmpc_qd
+# DW predictor based on Smith et al. SO(2)-Equivariant Downwash Models for Close Proximity Flight
 #----------------------------------
 import torch
 import torch.nn as nn
 
 
-# input format: x = [pos_rel, vel_rel] (relative state vector)
-# output format: y = f_dw_pred xyz-force of downwash
 
-
-class DWPredictor(nn.Module):
+class ShallowEquivariantPredictor(nn.Module):
     def __init__(self):
         super().__init__()
         self.flatten = nn.Flatten()
@@ -31,3 +26,6 @@ class DWPredictor(nn.Module):
     
 #model = DWPredictor().to("cuda")
 #print(model)
+
+def h(rel_pos, v_suff, v_prod):
+    pass
