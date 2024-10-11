@@ -19,17 +19,19 @@ from notify_script_end import notify_ending
 
 SAVE_MODEL = True
 
-#load_model = r"2024-10-07-15-58-03-NDP-Li-Model-sn_scale-None-chocolaty-line20000_eps.pth"
-load_model = None
+load_model = r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-10-19-44-57-NDP-Li-Model-sn_scale-4-194k-datapoints-corrected-bias-salty-instructor40000_eps.pth"
+#load_model = None
 
 seed = 0
 torch.manual_seed(seed)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 40000
-save_and_evaluate_m_epochs = 10000
-lr = 1e-4
+n_epochs = 20000
+evaluate_at_l_epochs = 100
+save_at_m_epochs = 80000
+
+lr = 1e-5
 #sn_gamma = 4 # scale factor for spectral normalization
-sn_gamma = 6
+sn_gamma = 5
  
 def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimizer, loss_fn):
 
@@ -88,14 +90,18 @@ def train():
     # list of tuples: ([px,py,pz, vx,vy,vz], [fx,fy,fz]) 
     # other vehicle - ego vehicle: [0,0,1]->[0,0,-6.5]
 
-    exp_name = init_experiment(f"NDP-Li-Model-sn_scale-{str(sn_gamma)}")
+    exp_name = init_experiment(f"NDP-Li-Model-sn_scale-{str(sn_gamma)}-194k-datapoints-corrected-bias")
 
     dataset = DWDataset([
-    r"datasets\2024-10-06-15-44-22-ndp-2-P600-forgiving-parameter-intermediate-savingsec-35000-ts.p",
-    r"datasets\2024-10-06-17-41-31-ndp-2-P600-wan-osprey-intermediate-savingsec-30000-ts.p",
-    r"datasets\2024-10-07-10-23-45-ndp-2-P600-low-dry-data-intermediate-savingsec-30000-ts.p",
-    r"datasets\2024-10-07-14-10-34-ndp-2-P600-mid-atomic-brass-intermediate-savingsec-35000-ts.p",
-    ])
+    #r"datasets\2024-10-06-15-44-22-ndp-2-P600-forgiving-parameter-intermediate-savingsec-35000-ts.p",
+    #r"datasets\2024-10-06-17-41-31-ndp-2-P600-wan-osprey-intermediate-savingsec-30000-ts.p",
+    #r"datasets\2024-10-07-10-23-45-ndp-2-P600-low-dry-data-intermediate-savingsec-30000-ts.p",
+    #r"datasets\2024-10-07-14-10-34-ndp-2-P600-mid-atomic-brass-intermediate-savingsec-35000-ts.p",
+    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-08-15-38-29-Dataset-NDP-2-P600-flush-frank-intermediate-savingsec-30000-ts.p",
+    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-08-14-27-23-Dataset-NDP-2-P600-optimal-normal-intermediate-savingsec-25000-ts.p",
+    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\data\two-P600-both-moving-100Hz\2024-10-08-15-38-29-Dataset-NDP-2-P600-flush-frank-720.0sec-72001-ts.p",
+
+    ], from_both_uavs=True)
 
 
     x_train, x_val, y_train, y_val = train_test_split(dataset.x, dataset.y, train_size=0.75, test_size=0.25,
@@ -132,7 +138,7 @@ def train():
         tr_err = train_one_epoch_with_spectral_normalization(x_train,y_train, model, optimizer, loss_fn)
         
         # process every n epochs
-        if epoch % save_and_evaluate_m_epochs == 0 and epoch > 0:
+        if epoch % evaluate_at_l_epochs == 0 and epoch > 0:
             print(f"\nEpoch {epoch+1}\n-------------------------------")
             #val_err = test_batch(val_loader, model, loss_fn)
 
@@ -141,10 +147,12 @@ def train():
             val_errors.append(val_err)
             print(f'training loss: {train_errors[-1]} \n validation loss: {val_errors[-1]}')
             
-            #notify_ending(f'{exp_name} at {epoch}/{n_epochs} ,\n training loss: {train_errors[-1]} \n validation loss: {val_errors[-1]}')
 
+        if epoch % save_at_m_epochs == 0:
             if SAVE_MODEL:
+                #notify_ending(f'{exp_name} at {epoch}/{n_epochs} ,\n training loss: {train_errors[-1]} \n validation loss: {val_errors[-1]}')
                 torch.save(model.state_dict(), exp_name + str(epoch) +"_eps"  + ".pth")
+            
 
 
 
@@ -165,6 +173,7 @@ def train():
     #print(model(st))
     #plot_xy_slices(model)
     plot_zy_yx_slices(model)
+    plot_z_slices(model)
     plot_3D_forces(model)
 
 

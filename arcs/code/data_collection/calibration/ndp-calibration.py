@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import sys, os
 sys.path.append('../../observers/baseline/')
 sys.path.append('../../uav/')
+sys.path.append('../../utils/')
+
 from uav import *
 from utils import *
 

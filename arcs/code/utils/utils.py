@@ -3,9 +3,13 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random as rnd
-
+import torch, sys
 sys.path.append('../../uav/')
 from uav import *
+sys.path.append("../../observers/ndp/")
+from model import DWPredictor
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def plot_xy_slices(model):
     """
@@ -272,7 +276,7 @@ def plot_z_slices(model):
     # add the bar and fix min-max colormap
     for im in all_imgs:
         #im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
-        im.set_clim(vmin=-20, vmax=0)
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
 
 
     fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
@@ -538,19 +542,25 @@ def extract_labeled_dataset_ndp(uav_list, bias=None):
     uav_1, uav_2 = uav_list
 
     title = f"\n (relative from {uav_2.name}'s view: rel_state = {uav_1.name} -  {uav_2.name})"
-    rel_state_list = [rel_state[0:6] for rel_state in np.array(uav_1.states) - np.array(uav_2.states)]
+    rel_states = np.array(uav_1.states) - np.array(uav_2.states)
+    rel_state_list = [rel_state[0:6] for rel_state in rel_states]
     dw_force_vectors = []
         
     if not uav_2.mounted_jft_sensor:
-
-        # Compute from F_uav = -mg + Fu + bias + Fd     => Fd = F_uav + mg - Fu - bias
+        print("deriving forces from residual formula")
+        # Compute from F_uav = -(mg+bias) + Fu + Fd     => Fd = F_uav + (mg+bias) - Fu 
         Fz_total = [uav_2.total_mass * state[8] for state in uav_2.states] # recorded actual uav m*a z-Force
         Fg = [uav_2.total_mass * 9.81 for state in uav_2.states] # uav gravitational force m*g
         Fz_u_total = np.array([-np.sum(body_r1_r2_r3_r4, axis=0) for body_r1_r2_r3_r4 in uav_2.jft_forces_list])
-        bias_steady_state = 4.5 # on average, Fu compentates always more by 5N, so it is not disturbance force
+        g_bias_steady_state = 4.5 # on average, Fu compentates always more by 5N, so it is not disturbance force
+        
+        print("total thrust forces:", Fz_u_total[-500:-400])
         
         dw_forces = np.array(Fz_total) + np.array(Fg) - np.array(Fz_u_total)
-        dw_forces -= bias_steady_state
+        dw_forces += g_bias_steady_state
+        #print("dw forces raw:", dw_forces[-500:-400])
+        #print("dw forces after subtracting bias:", dw_forces[-500:-400])
+
         dw_force_vectors = np.array([(0,0,dw_force) for dw_force in dw_forces])
 
     else:
@@ -646,3 +656,25 @@ def sample_circle_coords(zmax, zmin, radius_max, radius_min, other_uav_pos):
      new_z, new_radius = rnd.uniform(zmin + other_uav_pos[2], zmax + other_uav_pos[2]), rnd.uniform(radius_min, radius_max)
 
      return new_z, new_radius
+
+
+def evaluate_zy_force_curvature(models, rel_state_vector):
+    result_state_z_forces = []
+    for index, model in enumerate(models):
+        with torch.no_grad():
+            predictions = []
+            for rel_state in rel_state_vector:
+                input = torch.from_numpy(rel_state).to(torch.float32)
+                input = input[:6]
+                #print(input)
+                output = model(input.to(device))
+                predictions.append(output[2].cpu())
+        result_state_z_forces.append(predictions)
+
+    
+    
+    return result_state_z_forces
+
+
+        
+    

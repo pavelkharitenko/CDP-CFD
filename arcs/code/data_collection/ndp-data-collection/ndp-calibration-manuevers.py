@@ -15,7 +15,7 @@ from utils import *
 SAVE_EXP = True
 
 port = 25556
-SIM_DURATION = 577.0
+SIM_DURATION = 15.0
 DRONE_TOTAL_MASS = 3.035 # P600 weight
 HOVER_TIME = 30.0
 FLY_CIRCULAR = False
@@ -23,7 +23,7 @@ freq = 0.02
 radius = 3.0
 nan = float('NaN')
 
-exp_name = init_experiment("Dataset-NDP-2-P600")
+exp_name = init_experiment("1-P600-hovering-noise")
 
 #exp = load_forces_from_dataset("2024-10-03-20-13-43-ndp-2-P600-excited-wagon-570.0sec-57001-ts.p")
 #extract_labeled_dataset_ndp(exp['uav_list'])
@@ -54,7 +54,7 @@ controller.start()
 time_step = controller.get_time_step()  # time_step = 0.0001
 sim_max_duration = SIM_DURATION # sim seconds
 total_sim_steps = sim_max_duration / time_step
-control_frequency = 50.0 # Hz
+control_frequency = 100.0 # Hz
 # Calculate time steps between one control period
 steps_per_call = int(1.0 / control_frequency / time_step)
 print("One Timestep is ", time_step, "||", "Steps per call are", steps_per_call,"||", 
@@ -97,20 +97,25 @@ while curr_sim_time < sim_max_duration:
             px4_input_1 = (0.0, px, py-1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) # This is the actuator input vector
 
     else:
-        if curr_sim_time >= 7.0 and np.round(curr_sim_time,3) % 5.0 == 0.0:
+        if curr_sim_time >= 7.0 and np.round(curr_sim_time,3) % 2.5 == 0.0:
             uav_1_dest = plan_next_coords(0.9, 0.25, uav_1.states[-1][:3], uav_2_dest)
             print("##### Setting new UAV 1 dest", uav_1_dest)
 
         px4_input_1 = waypoint_after([0.0,4,7],[(0,1.5,4),(0,-1.5,4), uav_1_dest])
         px4_input_2 = waypoint_after([0.0],[uav_2_dest])
 
+        px4_input_1 = (0.0, nan, nan, nan, nan, nan, nan, nan, nan, nan, 0.0, nan)
+
 
         if np.round(curr_sim_time,3) % 50.0 == 0.0:
             if SAVE_EXP:
                 uav_1.controller, uav_2.controller = None, None
                 exp_path = save_experiment(exp_name, [uav_1, uav_2], EXP_SUCCESSFUL, "intermediate-saving")
-                notify_ending("Intermediate saving exp. " + str(exp_path) + " at time " + str(curr_sim_time))
                 print("intermediate saved", exp_name)
+                try:
+                    notify_ending("Intermediate saving exp. " + str(exp_path) + " at time " + str(curr_sim_time))
+                except:
+                    print("Connection error")
                 uav_1.controller, uav_2.controller = controller, controller
             
     
