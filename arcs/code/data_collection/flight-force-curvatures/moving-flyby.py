@@ -10,13 +10,13 @@ from uav import *
 from utils import *
 
 port = 25556
-SIM_DURATION = 3.0
+SIM_DURATION = 3
 DRONE_TOTAL_MASS = 3.035 # P600 weight
-HOVER_TIME = 1.0
+HOVER_TIME = 1.5
 FLY_CIRCULAR = False
 freq = 0.02
 radius = 3.0
-y_velocity = 3
+y_velocity = 2
 
 # connect to simulators controller
 controller = simcontrol2.Controller("localhost", port)
@@ -42,7 +42,7 @@ controller.start()
 time_step = controller.get_time_step()  # time_step = 0.0001
 sim_max_duration = SIM_DURATION # sim seconds
 total_sim_steps = sim_max_duration / time_step
-control_frequency = 30.0 # Hz
+control_frequency = 400.0 # Hz
 # Calculate time steps between one control period
 steps_per_call = int(1.0 / control_frequency / time_step)
 print("One Timestep is ", time_step, "||", "Steps per call are", steps_per_call,"||", 
@@ -116,11 +116,11 @@ print("Control experiment ended.")
 print("Collected ", len(rel_state_vector_list), "samples of data.")
 
 
-model_paths = [r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-12-25-27-NDP-Li-Model-sn_scale-None-144k-datapoints-corrected-bias-complicated-tropics20000_eps.pth",
-               r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-21-24-10-NDP-Li-Model-sn_scale-4-144k-datapoints-corrected-bias-sizzling-speed20000_eps.pth",
-               r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-10-10-56-56-NDP-Li-Model-sn_scale-2-144k-datapoints-corrected-bias-edible-status20000_eps.pth",
-               r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-10-25-10-NDP-Li-Model-sn_scale-None-114k-datapoints-inventive-defilade20000_eps.pth",
-               r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-10-47-22-NDP-Li-Model-sn_scale-4-114k-datapoints-stubborn-content20000_eps.pth"
+model_paths = [#r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-12-25-27-NDP-Li-Model-sn_scale-None-144k-datapoints-corrected-bias-complicated-tropics20000_eps.pth",
+               #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-21-24-10-NDP-Li-Model-sn_scale-4-144k-datapoints-corrected-bias-sizzling-speed20000_eps.pth",
+               #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-10-10-56-56-NDP-Li-Model-sn_scale-2-144k-datapoints-corrected-bias-edible-status20000_eps.pth",
+               #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-10-25-10-NDP-Li-Model-sn_scale-None-114k-datapoints-inventive-defilade20000_eps.pth",
+               #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-10-47-22-NDP-Li-Model-sn_scale-4-114k-datapoints-stubborn-content20000_eps.pth"
                ]
 
 models = []

@@ -7,7 +7,10 @@ import torch, sys
 sys.path.append('../../uav/')
 from uav import *
 sys.path.append("../../observers/ndp/")
-from model import DWPredictor
+sys.path.append("../../observers/SO2/")
+from model import *
+
+
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -215,7 +218,7 @@ def plot_zy_yx_slices(model):
 
 def plot_z_slices(model):
     # Plot xy-slices at different Z-values:
-    xy_plane_z_samples = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.1, 1.3, 1.5]
+    xy_plane_z_samples = [-1.5, -1.0, -0.75, -0.5, 0.0, 0.5, 1.0, 1.25, 1.5]
     xy_range = 1.0 # size of XY plane
     plane_res = 400 # number of points sampled for plotting in one dimension
 
@@ -364,6 +367,106 @@ def plot_model_compare(model_list):
     plt.show()
 
 
+def plot_so2_line(model):
+    # generate custom trajectory of bravo uav
+    model.eval()
+    y_range = 1.0
+    velocity_y = 0.1
+    num_points = 200
+
+    # Generate y positions
+    y_positions = np.linspace(-y_range, y_range, num_points)
+    uav_2_rel_vectors = []
+    dw_predictions = []
+    y_positions_list = []
+
+    for i, y in enumerate(y_positions):
+        position = [0.0, y, 1.0]
+        vB = [0.0, velocity_y, 0.0]
+        vA = [0.0, 0.0, 0.0]
+        
+        state = position + vB + vA
+        hx = np.array(h(position, vB, vA))
+        with torch.no_grad():
+            hx = torch.from_numpy(hx).to(torch.float32).cuda()
+
+            model_pred = model(hx)
+            pred_dw = F(state, model_pred)
+            dw_predictions.append(pred_dw[2].cpu())
+
+            uav_2_rel_vectors.append(state)
+            y_positions_list.append(y)
+
+    plt.plot(y_positions_list, dw_predictions, label="Equivariant prediction")
+    plt.legend()
+    plt.show()
+
+
+
+
+def plot_so2_xy_slice(model):
+    # Plot xy-slices at different Z-values:
+    xy_plane_z_samples = [-1.0, -0.5, 0.0, 0.5, 1.0 ]
+    xy_range = 1.0 # size of XY plane
+    plane_res = 200 # number of points sampled for plotting in one dimension
+
+    color="autumn"
+    test_f = []
+    fig, ax = plt.subplots(1, len(xy_plane_z_samples), sharex=True, sharey=True)
+
+    
+    model.eval()
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    
+    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
+
+    all_imgs = [] # save all
+
+    # loop over Z-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 9])
+        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                dx = [xy_samples[i], xy_samples[j], z_point]
+                vB = [0.0, 0.1, 0.0]
+                vA = [0.0, 0.0, 0.0]
+
+                hx = np.array(h(dx, vB, vA))
+
+                with torch.no_grad():
+                    hx = torch.from_numpy(hx).to(torch.float32).cuda()
+
+                    model_pred = model(hx)
+                    pred_dw = F(dx, model_pred)
+                    
+                    plot_f[i, j] = pred_dw[2].cpu()
+                    plotted_forces.append(pred_dw[2].cpu().numpy())
+               
+
+        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[idx].set_title(f"Z = {z_point}m")
+        
+    
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    # add the bar and fix min-max colormap
+    for im in all_imgs:
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    plt.xlabel('Forces in Newton (N)')
+    
+    plt.show()
+
 
 
 
@@ -443,11 +546,14 @@ def plot_3d_vectorfield(startpositions, vectors, scale, title):
     #plt.savefig("3D_DW_dummydata.png")
 
 
-def plot_NN_training(train_errors, val_errors):
+def plot_NN_training(train_errors, val_errors, eval_L_epochs=None):
     t = range(len(train_errors))
     plt.plot(t,train_errors, label='training error')
     plt.plot(t,val_errors, label='validation error')
-    plt.xlabel("Epoch i")
+    if eval_L_epochs:
+        plt.xlabel("Every " + str(eval_L_epochs) + " epochs")
+    else:
+        plt.xlabel("epochs")
     plt.ylabel("Errors")
     plt.legend()
     plt.show()
@@ -547,22 +653,8 @@ def extract_labeled_dataset_ndp(uav_list, bias=None):
     dw_force_vectors = []
         
     if not uav_2.mounted_jft_sensor:
-        print("deriving forces from residual formula")
-        # Compute from F_uav = -(mg+bias) + Fu + Fd     => Fd = F_uav + (mg+bias) - Fu 
-        Fz_total = [uav_2.total_mass * state[8] for state in uav_2.states] # recorded actual uav m*a z-Force
-        Fg = [uav_2.total_mass * 9.81 for state in uav_2.states] # uav gravitational force m*g
-        Fz_u_total = np.array([-np.sum(body_r1_r2_r3_r4, axis=0) for body_r1_r2_r3_r4 in uav_2.jft_forces_list])
-        g_bias_steady_state = 4.5 # on average, Fu compentates always more by 5N, so it is not disturbance force
-        
-        print("total thrust forces:", Fz_u_total[-500:-400])
-        
-        dw_forces = np.array(Fz_total) + np.array(Fg) - np.array(Fz_u_total)
-        dw_forces += g_bias_steady_state
-        #print("dw forces raw:", dw_forces[-500:-400])
-        #print("dw forces after subtracting bias:", dw_forces[-500:-400])
-
-        dw_force_vectors = np.array([(0,0,dw_force) for dw_force in dw_forces])
-
+        print("Deriving forces from residual formula")
+        dw_force_vectors = compute_residual_dw_forces(uav_2)
     else:
         # extract forces from UAV2's mounted jft sensor
         if bias:
@@ -579,11 +671,52 @@ def extract_labeled_dataset_ndp(uav_list, bias=None):
     #print("positive data", [pos_data for pos_data in xy_data if pos_data[0][2]<-1.0])
 
     
-    plot_3d_vectorfield(rel_state_list[0::20], dw_force_vectors[0::20], 
-                        1.0/np.max(np.abs(dw_force_vectors)), 
-                        "Created z-force dataset from collected data" + title)
+    plot_3d_vectorfield(rel_state_list[0::20], dw_force_vectors[0::20], 1.0/np.max(np.abs(dw_force_vectors)),  "Created z-force dataset from collected data" + title)
         
     return rel_state_list, dw_force_vectors
+
+def extract_labeled_dataset_so2(uav_list):
+    """
+    Extract relative position (uav1 - uav2), uav2 vel, uav1 vel, and dw forces.
+    """
+    uav_1, uav_2 = uav_list
+
+    rel_states = np.array(uav_1.states) - np.array(uav_2.states)
+    rel_pos = [rel_state[0:3] for rel_state in rel_states]
+    v_a_list = [state[3:6] for state in np.array(uav_1.states)]
+    v_b_list = [state[3:6] for state in np.array(uav_2.states)]
+
+    dw_force_vectors = compute_residual_dw_forces(uav_2)
+
+    return rel_pos, v_b_list, v_a_list, dw_force_vectors
+   
+    
+
+    
+def compute_residual_dw_forces(uav):
+    """
+    Compute from F_uav = -(mg+bias) + Fu + Fd     => Fd = F_uav + (mg+bias) - Fu 
+
+    Returns list of (0,0,fz) tuples
+    """
+    Fz_total = [uav.total_mass * state[8] for state in uav.states] # recorded actual uav m*a z-Force
+    Fg = [uav.total_mass * 9.81 for state in uav.states] # uav gravitational force m*g
+    Fz_u_total = np.array([-np.sum(body_r1_r2_r3_r4, axis=0) for body_r1_r2_r3_r4 in uav.jft_forces_list])
+    g_bias_steady_state = 4.5 # on average, Fu compentates always more by 5N, so it is not disturbance force
+    
+    #print("total thrust forces:", Fz_u_total[-500:-400])
+    
+    dw_forces = np.array(Fz_total) + np.array(Fg) - np.array(Fz_u_total)
+    dw_forces += g_bias_steady_state
+    #print("dw forces raw:", dw_forces[-500:-400])
+    #print("dw forces after subtracting bias:", dw_forces[-500:-400])
+
+    dw_force_vectors = np.array([(0,0,dw_force) for dw_force in dw_forces])
+
+    return dw_force_vectors
+
+
+
 
 
     
@@ -677,4 +810,3 @@ def evaluate_zy_force_curvature(models, rel_state_vector):
 
 
         
-    

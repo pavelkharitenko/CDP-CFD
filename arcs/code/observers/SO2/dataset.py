@@ -2,14 +2,16 @@ import numpy as np
 import torch, sys
 sys.path.append('../../utils/')
 from utils import *
+from model import *
 
-class DWDataset(torch.utils.data.Dataset):
-    def __init__(self, experiment_paths, from_both_uavs=False):
+class SO2Dataset(torch.utils.data.Dataset):
+    def __init__(self, experiment_paths, extract_twice=False):
         self.exp_paths = experiment_paths
-        if from_both_uavs:
-            self.extract_ndp_labels_twice()
+        if extract_twice:
+            self.extract_so2_labels_twice()
         else:
-            self.extract_ndp_labels()
+            self.extract_so2_labels()
+        
 
     def __len__(self):
         return self.N
@@ -17,83 +19,74 @@ class DWDataset(torch.utils.data.Dataset):
     def __getitem__(self,index):
         return self.x[index,:], self.y[index,:]
         
-    def extract_ndp_labels(self):
+    def extract_so2_labels(self):
+        """
+        Extract relative position (uav1 - uav2), uav2 vel, uav1 vel, and dw forces
+        """
         self.N = 0
         x, y = [], []
         for exp_path in self.exp_paths:
             exp = load_forces_from_dataset(exp_path)
             uav_1, uav_2 = exp['uav_list']
-            if "bias" in exp:
-                x_i, y_i = extract_labeled_dataset_ndp([uav_1, uav_2], exp['bias'])
-            else:
-                x_i, y_i = extract_labeled_dataset_ndp([uav_1, uav_2])
 
-            #print("### Max value rec.:", np.max([np.abs(y_i_j[2]) for y_i_j in y_i]))
-            #print("### Max value rec.:", y_i[-4000:-3990])
+            rel_pos, v_suff, v_prod, dw_forces = extract_labeled_dataset_so2([uav_1, uav_2])
+            dp_vb_va_list = list(zip(rel_pos, v_suff, v_prod))
+            x.extend([ h(dp_vb_va[0], dp_vb_va[1], dp_vb_va[2]) + [dp_vb_va[0][0], dp_vb_va[0][1], dp_vb_va[0][2]] for dp_vb_va in dp_vb_va_list])
 
-            x.extend(x_i)
-            y.extend(y_i)
-            #print("######################")
-
-            
-
-        #print("extracted total X data of length:", len(x))
-        #print("extracted total Y labels of length:", len(y))
-
-            
-            
-    
-        self.x =  torch.tensor(x).to(torch.float32)
-        self.y =  torch.tensor(y).to(torch.float32)
-
-        self.N = len(self.x)
-
-        #print("### data samples", self.x[:5,:])
-        #print("### data samples", self.y[:5,:])
-
-
-    def extract_ndp_labels_twice(self):
-        self.N = 0
-        x, y = [], []
-        for exp_path in self.exp_paths:
-            exp = load_forces_from_dataset(exp_path)
-            uav_1, uav_2 = exp['uav_list']
-            if "bias" in exp:
-                x_i, y_i = extract_labeled_dataset_ndp([uav_1, uav_2], exp['bias'])
-            else:
-                x_i, y_i = extract_labeled_dataset_ndp([uav_1, uav_2])
-
-            #print("### Max value rec.:", np.max([np.abs(y_i_j[2]) for y_i_j in y_i]))
-            #print("### Max value rec.:", y_i[-4000:-3990])
-
-            x.extend(x_i)
-            y.extend(y_i)
-
-            
-            if "bias" in exp:
-                x_i, y_i = extract_labeled_dataset_ndp([uav_2, uav_1], exp['bias'])
-            else:
-                x_i, y_i = extract_labeled_dataset_ndp([uav_2, uav_1])
-
-            x.extend(x_i)
-            y.extend(y_i)
-            #print("######################")
-
-            #print("######### x sample:", x[:5])
-            #print("######### y sample:", y[:5])
+            y.extend(dw_forces)
 
         print("extracted total data of lenghts:", len(x))
         print("extracted total data of lenghts:", len(y))
 
-        print("### Max value rec.:", y_i[300:350])
-            
-            
     
-        self.x =  torch.tensor(x).to(torch.float32)
-        self.y =  torch.tensor(y).to(torch.float32)
+        self.x =  torch.tensor(np.array(x)).to(torch.float32)
+        self.y =  torch.tensor(np.array(y)).to(torch.float32)
+
+        #print(self.x[:2])
+        #print(self.y[:2])
+
 
         self.N = len(self.x)
 
+
+
+
+    def extract_so2_labels_twice(self):
+        """
+        Extract relative position (uav1 - uav2), uav2 vel, uav1 vel, and dw forces
+        """
+        self.N = 0
+        x, y = [], []
+        for exp_path in self.exp_paths:
+            exp = load_forces_from_dataset(exp_path)
+            uav_1, uav_2 = exp['uav_list']
+
+            rel_pos, v_suff, v_prod, dw_forces = extract_labeled_dataset_so2([uav_1, uav_2])
+            dp_vb_va_list = list(zip(rel_pos, v_suff, v_prod))
+
+            x.extend([ h(dp_vb_va[0], dp_vb_va[1], dp_vb_va[2]) + [dp_vb_va[0][0], dp_vb_va[0][1], dp_vb_va[0][2]] for dp_vb_va in dp_vb_va_list])
+            y.extend(dw_forces)
+
+            rel_pos, v_suff, v_prod, dw_forces = extract_labeled_dataset_so2([uav_2, uav_1])
+            dp_vb_va_list = list(zip(rel_pos, v_suff, v_prod))
+
+            x.extend([ h(dp_vb_va[0], dp_vb_va[1], dp_vb_va[2]) + [dp_vb_va[0][0], dp_vb_va[0][1], dp_vb_va[0][2]] for dp_vb_va in dp_vb_va_list])
+            y.extend(dw_forces)
+
+
+
+        print("extracted total data of lenghts:", len(x))
+        print("extracted total data of lenghts:", len(y))
+
+    
+        self.x =  torch.tensor(np.array(x)).to(torch.float32)
+        self.y =  torch.tensor(np.array(y)).to(torch.float32)
+
+        #print(self.x[:2])
+        #print(self.y[:2])
+
+
+        self.N = len(self.x)
 
 
 

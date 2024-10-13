@@ -21,13 +21,13 @@
           - 0.0
         joint_velocities:
           p600__rotor_0_joint:
-            - 400.0
+            - 320.0
           p600__rotor_1_joint:
-            - 400.0
+            - 320.0
           p600__rotor_2_joint:
-            - -400.0
+            - -320.0
           p600__rotor_3_joint:
-            - -400.0
+            - -320.0
       - file_path: "p600_2.urdf"
         name: "p600_2"
         initial_position:
@@ -42,21 +42,21 @@
           - 0.0
         joint_velocities:
           p600__rotor_0_joint:
-            - 400.0
+            - 320.0
           p600__rotor_1_joint:
-            - 400.0
+            - 320.0
           p600__rotor_2_joint:
-            - -400.0
+            - -320.0
           p600__rotor_3_joint:
-            - -400.0
+            - -320.0
     
      
   fluid:
     blocks:
-      max_block_count: 178
+      max_block_count: 450
     fluid:
-      resolution: 0.05
-      max_velocity: 250.0
+      resolution: 0.02
+      max_velocity: 80.0
       initial_density: 1.225
       initial_velocity:
         - 0.0
