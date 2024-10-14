@@ -53,9 +53,9 @@
      
   fluid:
     blocks:
-      max_block_count: 450
+      max_block_count: 550
     fluid:
-      resolution: 0.02
+      resolution: 0.04
       max_velocity: 80.0
       initial_density: 1.225
       initial_velocity:

@@ -10,7 +10,7 @@ from uav import *
 from utils import *
 
 port = 25556
-SIM_DURATION = 30.0
+SIM_DURATION = 15.0
 DRONE_TOTAL_MASS = 3.035 # P600 weight
 HOVER_TIME = 30.0
 FLY_CIRCULAR = False
@@ -41,7 +41,7 @@ controller.start()
 time_step = controller.get_time_step()  # time_step = 0.0001
 sim_max_duration = SIM_DURATION # sim seconds
 total_sim_steps = sim_max_duration / time_step
-control_frequency = 30.0 # Hz
+control_frequency = 400.0 # Hz
 # Calculate time steps between one control period
 steps_per_call = int(1.0 / control_frequency / time_step)
 print("One Timestep is ", time_step, "||", "Steps per call are", steps_per_call,"||", 
@@ -81,14 +81,14 @@ while curr_sim_time < sim_max_duration:
     else:
         if curr_sim_time < HOVER_TIME:
             #px4_input_1 = (0.0, nan,nan,nan, 0.0, 0.0, 0.0, nan, nan, nan, 0.0, nan) 
-            px4_input_1 = (0.0, 0.0, 1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            px4_input_1 = (0.0, 0.0, 1., 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
         else:
             # keep position
-            px4_input_1 = (0.0, 0.0, 1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            px4_input_1 = (0.0, 0.0, 1., 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
             #px4_input_1 = (0.0, nan,nan,nan, 0.0, 0.0, 0.0, nan, nan, nan, 0.0, nan) 
             
     # second drone just hovering
-    px4_input_2 = (0.0, 0.0, -1.5, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan)
+    px4_input_2 = (0.0, 0.0, -1., 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan)
 
     # Simulate a control period, giving actuator input and retrieving sensor output
     reply = controller.simulate(steps_per_call,  {
@@ -130,7 +130,7 @@ print("Collected ", len(rel_state_vector_list), "samples of data.")
 
 #plot_uav_force_statistics(uav_1.timestamp_list, uav_1.ext_forces_list, uav_1.jft_forces_list,  [uav_1.mass*state[8] for state in uav_1.states])
 
-plot_uav_statistics([uav_1,uav_2])
+plot_uav_statistics([uav_1,uav_2], begin=5.0, end=15.0)
 
 
 plt.show()

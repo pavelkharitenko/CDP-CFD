@@ -12,7 +12,7 @@ from utils import *
 port = 25556
 SIM_DURATION = 3
 DRONE_TOTAL_MASS = 3.035 # P600 weight
-HOVER_TIME = 1.5
+HOVER_TIME = 1.2
 FLY_CIRCULAR = False
 freq = 0.02
 radius = 3.0
