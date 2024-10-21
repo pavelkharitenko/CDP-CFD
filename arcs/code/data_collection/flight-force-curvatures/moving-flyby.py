@@ -2,21 +2,25 @@ from simcontrol import simcontrol2
 import numpy as np
 import matplotlib.pyplot as plt
 import sys, os
-sys.path.append('../../observers/baseline/')
+sys.path.append('../../observers/')
 sys.path.append('../../uav/')
 sys.path.append('../../utils/')
+
+from SO2.model import ShallowEquivariantPredictor
+from ndp.model import DWPredictor
+from neuralswarm.model import NeuralSwarmPredictor
 
 from uav import *
 from utils import *
 
 port = 25556
-SIM_DURATION = 3
+SIM_DURATION = 5.0
 DRONE_TOTAL_MASS = 3.035 # P600 weight
 HOVER_TIME = 1.2
 FLY_CIRCULAR = False
 freq = 0.02
 radius = 3.0
-y_velocity = 2
+y_velocity = 0.75
 
 # connect to simulators controller
 controller = simcontrol2.Controller("localhost", port)
@@ -42,7 +46,7 @@ controller.start()
 time_step = controller.get_time_step()  # time_step = 0.0001
 sim_max_duration = SIM_DURATION # sim seconds
 total_sim_steps = sim_max_duration / time_step
-control_frequency = 400.0 # Hz
+control_frequency = 1000.0 # Hz
 # Calculate time steps between one control period
 steps_per_call = int(1.0 / control_frequency / time_step)
 print("One Timestep is ", time_step, "||", "Steps per call are", steps_per_call,"||", 
@@ -98,8 +102,8 @@ while curr_sim_time < sim_max_duration:
     uav_2.update(reply, curr_sim_time)
     
     rel_state_vector_uav_2 = np.round(np.array(uav_1.states[-1]) - np.array(uav_2.states[-1]), 2)
-    #print(rel_state_vector)
-    rel_state_vector_list.append(rel_state_vector_uav_2)
+    
+    rel_state_vector_list.append(rel_state_vector_uav_2[:6])
     
 
     # advance timer and step counter:
@@ -116,42 +120,7 @@ print("Control experiment ended.")
 print("Collected ", len(rel_state_vector_list), "samples of data.")
 
 
-model_paths = [#r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-12-25-27-NDP-Li-Model-sn_scale-None-144k-datapoints-corrected-bias-complicated-tropics20000_eps.pth",
-               #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-21-24-10-NDP-Li-Model-sn_scale-4-144k-datapoints-corrected-bias-sizzling-speed20000_eps.pth",
-               #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-10-10-56-56-NDP-Li-Model-sn_scale-2-144k-datapoints-corrected-bias-edible-status20000_eps.pth",
-               #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-10-25-10-NDP-Li-Model-sn_scale-None-114k-datapoints-inventive-defilade20000_eps.pth",
-               #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-09-10-47-22-NDP-Li-Model-sn_scale-4-114k-datapoints-stubborn-content20000_eps.pth"
-               ]
-
-models = []
-for model_path in model_paths:
-    model = DWPredictor().to(device)
-    model.load_state_dict(torch.load(model_path, weights_only=True))
-    model.eval()
-    models.append(model)
-
-predictions = evaluate_zy_force_curvature(models, rel_state_vector_list)
-labels = ["Li's NDP (no sn)","sn<=4", "sn <=2", "no sn, old bias","sn<4 old bias"]
-
-
-
-
-
-
-
-
-
-for idx, prediction in enumerate(predictions):
-    print("plotting pred.")
-    plt.plot(time_seq, prediction, label=labels[idx])
-
-
-plt.xlabel("time (s)")
-plt.ylabel("Force (N)")
-plt.title(f"Measured and predicted DW forces at\nSpeed of Y={y_velocity} (Both Hovering)")
-
-
-
+# Plot recorded and predicted forces
 
 Fz_total = [uav_2.total_mass * state[8] for state in uav_2.states] # recorded actual uav m*a z-Force
 Fg = [uav_2.total_mass * 9.81 for state in uav_2.states] # uav gravitational force m*g
@@ -164,9 +133,47 @@ dw_forces += g_bias_steady_state
 #print("dw forces after subtracting bias:", dw_forces[-500:-400])
 
 dw_force_vectors = np.array([(0,0,dw_force) for dw_force in dw_forces])
-
-
 plt.plot(time_seq,[meas[2] for meas in dw_force_vectors], label='Recorded z-force')
+
+model_paths = [
+    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\trained_models\100Hz-data-both-drones-summed-dataset\2024-10-09-21-24-10-NDP-Li-Model-sn_scale-4-144k-datapoints-corrected-bias-sizzling-speed20000_eps.pth",
+    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\SO2\2024-10-13-16-08-18-SO2-Model-sn_scale-None-yummy-moss20000_eps.pth",
+    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-10-20-11-29-07-NSwarm-Model-sn_scale-4-144k-datapoints-corrected-bias-timid-pocket20000_eps.pth", 
+]
+
+models = []
+
+model = DWPredictor()
+model.load_state_dict(torch.load(model_paths[0], weights_only=True))
+models.append(model)
+
+model = ShallowEquivariantPredictor()
+model.load_state_dict(torch.load(model_paths[1], weights_only=True))
+models.append(model)
+
+model = NeuralSwarmPredictor()
+model.load_state_dict(torch.load(model_paths[2], weights_only=True))
+models.append(model)
+
+predictions = evaluate_zy_force_curvature(models, np.array(rel_state_vector_list))
+labels = ["NDP with SN<4", "SO2-Equiv.", "Nrl.Swarm 2 UAV"]
+
+
+
+for idx, prediction in enumerate(predictions):
+    print("plotting pred.")
+    plt.plot(time_seq, prediction[:,2], label=labels[idx])
+
+
+plt.xlabel("time (s)")
+plt.ylabel("Force (N)")
+plt.title(f"Measured and predicted DW forces at\nSpeed of Y={y_velocity} (Both Hovering)")
+
+
+
+
+
+
 plt.legend()
 plt.show()
 

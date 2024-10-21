@@ -403,6 +403,175 @@ def plot_so2_line(model):
 
 
 
+def plot_zy_yx_slices_ns(model):
+    # Plot xy-slices at different Z-values:
+    xy_plane_z_samples = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.1, 1.3, 1.5]
+    xy_range = 1.0 # size of XY plane
+    plane_res = 400 # number of points sampled for plotting in one dimension
+
+    color="autumn"
+    test_f = []
+    fig, ax = plt.subplots(2, len(xy_plane_z_samples), sharex=True, sharey=True, figsize=(6, 6))
+
+    
+    model.eval()
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    
+    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
+
+    all_imgs = [] # save all
+
+    # loop over Z-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 6])
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                sample_matrix[i * plane_res + j, 0] = xy_samples[i]
+                sample_matrix[i * plane_res + j, 1] = xy_samples[j]
+                sample_matrix[i * plane_res + j, 2] = z_point
+        
+        
+        sample_tensor = torch.from_numpy(sample_matrix).to(torch.float32)
+        input = torch.autograd.Variable(sample_tensor).cuda()
+        output = model(input)
+        test_f.append(output)
+        zs = output
+        
+        # add all encountered z-forces and save them for evaluating 
+        plotted_forces.extend(zs.detach().cpu().numpy())
+
+
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                plot_f[i, j] = zs[i * plane_res + j]
+
+        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[0][idx].set_title(f"Z = {z_point}m")
+        
+    
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    # plot xz-slice
+
+    for k, test_y in enumerate(xy_plane_z_samples):
+        
+        test_xz = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        test_matrix = np.zeros([plane_res**2, 6])
+        # matrix actually (y,x,z) of state vector:
+        for i in range(plane_res):
+            for j in range(plane_res):
+                test_matrix[i * plane_res + j, 0] = test_y
+                test_matrix[i * plane_res + j, 1] = test_xz[i]
+                test_matrix[i * plane_res + j, 2] = test_xz[j]
+        
+        
+        torch_matrix = torch.from_numpy(test_matrix).to(torch.float32)
+        input = torch.autograd.Variable(torch_matrix).cuda()
+        output = model(input)
+        test_f.append(output)
+        ys = output
+        
+        plotted_forces.extend(ys.detach().cpu().numpy())
+
+        plot_f = np.zeros((plane_res, plane_res))
+        for i in range(plane_res):
+            for j in range(plane_res):
+                plot_f[i, j] = ys[i * plane_res + j]
+
+        im = ax[1][k].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color,
+                             origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[1][k].set_title(f"Y = {test_y}m")
+
+    # add the bar and fix min-max colormap
+    for im in all_imgs:
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    plt.xlabel('Forces in Newton (N)')
+    #plt.ylabel('dummy data')
+    
+    plt.show()
+
+
+def plot_z_slices_ns(model):
+    # Plot xy-slices at different Z-values:
+    xy_plane_z_samples = [-1.5, -1.0, -0.75, -0.5, 0.0, 0.5, 1.0, 1.25, 1.5]
+    xy_range = 1.0 # size of XY plane
+    plane_res = 400 # number of points sampled for plotting in one dimension
+
+    color="autumn"
+    test_f = []
+    fig, ax = plt.subplots(1, len(xy_plane_z_samples), sharex=True, sharey=True)
+
+    
+    model.eval()
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    
+    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
+
+    all_imgs = [] # save all
+
+    # loop over Z-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 6])
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                sample_matrix[i * plane_res + j, 0] = xy_samples[i]
+                sample_matrix[i * plane_res + j, 1] = xy_samples[j]
+                sample_matrix[i * plane_res + j, 2] = z_point
+        
+        
+        sample_tensor = torch.from_numpy(sample_matrix).to(torch.float32)
+        input = torch.autograd.Variable(sample_tensor).cuda()
+        output = model(input)
+        test_f.append(output)
+        zs = output
+        
+        # add all encountered z-forces and save them for evaluating 
+        plotted_forces.extend(zs.detach().cpu().numpy())
+
+
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                plot_f[i, j] = zs[i * plane_res + j]
+
+        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[idx].set_title(f"Z = {z_point}m")
+        
+    
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    # add the bar and fix min-max colormap
+    for im in all_imgs:
+        #im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+
+
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    plt.xlabel('Forces in Newton (N)')
+    
+    
+    plt.show()
+
 
 def plot_so2_xy_slice(model):
     # Plot xy-slices at different Z-values:
@@ -466,6 +635,7 @@ def plot_so2_xy_slice(model):
     plt.xlabel('Forces in Newton (N)')
     
     plt.show()
+
 
 
 
@@ -690,7 +860,31 @@ def extract_labeled_dataset_so2(uav_list):
 
     return rel_pos, v_b_list, v_a_list, dw_force_vectors
    
+
+def extract_labeled_dataset_ns(uav_list, bias=None):
+    uav_1, uav_2 = uav_list
+
+    title = f"\n (relative from {uav_2.name}'s view: rel_state = {uav_1.name} -  {uav_2.name})"
+    rel_states = np.array(uav_1.states) - np.array(uav_2.states)
+    rel_state_list = [rel_state[0:6] for rel_state in rel_states]
+    dw_force_vectors = []
+        
+    print("Deriving forces from residual formula")
+    dw_force_vectors = compute_residual_dw_forces(uav_2)
+    dw_force_vectors = [f_xyz[2] for f_xyz in dw_force_vectors]
+
+    xy_data = list(zip(rel_state_list, dw_force_vectors))
+    print("lenghts inside rel state list:", len(rel_state_list))
+    print("lenghts inside dw force vectors:", len(dw_force_vectors))
     
+    #print("data extracted:", xy_data[-2200:-2000])
+    #print("positive data", [pos_data for pos_data in xy_data if pos_data[0][2]<-1.0])
+
+    
+    #plot_3d_vectorfield(rel_state_list[0::20], dw_force_vectors[0::20], 1.0/np.max(np.abs(dw_force_vectors)),  "Created z-force dataset from collected data" + title)
+        
+    return rel_state_list, dw_force_vectors
+
 
     
 def compute_residual_dw_forces(uav):
@@ -791,22 +985,16 @@ def sample_circle_coords(zmax, zmin, radius_max, radius_min, other_uav_pos):
      return new_z, new_radius
 
 
-def evaluate_zy_force_curvature(models, rel_state_vector):
-    result_state_z_forces = []
+def evaluate_zy_force_curvature(models, rel_state_vectors):
+    """
+    Plots zy-force figure for recorded flyby experiement
+    """
+    predicted_z_curves = []
     for index, model in enumerate(models):
-        with torch.no_grad():
-            predictions = []
-            for rel_state in rel_state_vector:
-                input = torch.from_numpy(rel_state).to(torch.float32)
-                input = input[:6]
-                #print(input)
-                output = model(input.to(device))
-                predictions.append(output[2].cpu())
-        result_state_z_forces.append(predictions)
-
-    
-    
-    return result_state_z_forces
+        dw_forces = model.evaluate(rel_state_vectors)
+        predicted_z_curves.append(dw_forces)
+  
+    return predicted_z_curves
 
 
         

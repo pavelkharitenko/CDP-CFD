@@ -29,5 +29,15 @@ class DWPredictor(nn.Module):
         #x = self.flatten(x)
         return self.linear_relu_stack(x)
     
-#model = DWPredictor().to("cuda")
-#print(model)
+
+    def evaluate(self, rel_state_vectors):
+        """
+        From R:6 (rel_pos, rel_vel) to R:3 (dw_x, dw_y, dw_z) 
+        """
+        with torch.no_grad():
+            inputs = torch.tensor(rel_state_vectors).to(torch.float32)
+            dw_forces = self.forward(inputs)
+            return dw_forces.detach().cpu().numpy()
+
+
+

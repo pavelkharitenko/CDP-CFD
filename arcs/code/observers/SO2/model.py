@@ -20,8 +20,26 @@ class ShallowEquivariantPredictor(nn.Module):
     def forward(self,x):
         return self.layers(x)
     
-#model = DWPredictor().to("cuda")
-#print(model)
+
+    def evaluate(self, rel_state_vectors):
+        """
+        From R:6 (rel_pos, rel_vel) to R:3 (0, 0, dw_z) 
+        """
+
+        hx_list = [h(rel_state[:3], rel_state[3:6], np.zeros((3,))) for rel_state in rel_state_vectors]
+        with torch.no_grad():
+
+            h_inputs = torch.tensor(hx_list).to(torch.float32)
+            dp_tensor = torch.tensor(rel_state_vectors[:,:3])
+
+            predicted = self.forward(h_inputs)
+            dw_forces = F_tnsr(dp_tensor, predicted).detach().cpu().numpy()
+            
+           
+            
+            return dw_forces
+
+
 
 def proj_A(vec):
     vector = Vector(vec)
@@ -54,7 +72,6 @@ def h(rel_pos, v_suff, v_prod):
     ]
 
     return result
-
 
 
 
@@ -96,13 +113,5 @@ def F_tnsr(rel_positions, f_results):
 
     return dw_forces
 
-    
-
-
-#print(F_tnsr(-1,1))
-
-
-#test = h([1,1,1],[0,0,1],[0,0,0])
-#print(test)
 
 
