@@ -6,7 +6,7 @@ class UAVSimulator:
     def __init__(self):
         self.port = 25556
         self.control_frequency = 200 # in Hz
-        self.sim_max_duration = 3 # in seconds
+        self.sim_max_duration = 0.8 # in seconds
         self.state = None  # Current state of the UAV
         self.done = False  # Simulation end flag
         self.reset()       # Initialize the simulation
@@ -18,23 +18,34 @@ class UAVSimulator:
         return self.state
 
     def get_initial_state(self):
+        """Init interface to AR, to AR's UAV's actuators, sensors, etc."""
+        # get input/output control handle from AR sim
         self.controller = simcontrol2.Controller("localhost", self.port)
         self.controller.start()
 
         # init time params
         self.time_step = self.controller.get_time_step()
         self.total_sim_time_steps = self.sim_max_duration / self.time_step
-        self.steps_per_call = int(int(1.0 / self.control_frequency / self.time_step))
+        self.steps_per_call = int(1.0 / self.control_frequency / self.time_step)
         self.curr_sim_time = 0.0
         self.curr_step = 0
+        
 
         # init sensors
         self.imu1_idx = self.controller.get_sensor_info('imu1').index
         self.imu2_idx = self.controller.get_sensor_info('imu2').index
 
         # init actuators
+        # px4 controller handle
         self.px4_input1_idx = self.controller.get_actuator_info('controller1').index
-        self.px4_input2_idx = self.controller.get_actuator_info('controller1').index
+
+        # RL agent's UAV2 rotor actuators handles
+        self.uav_2_r1_idx = self.controller.get_actuator_info("uav_2_r1_joint_motor").index
+        self.uav_2_r2_idx = self.controller.get_actuator_info("uav_2_r2_joint_motor").index
+        self.uav_2_r3_idx = self.controller.get_actuator_info("uav_2_r3_joint_motor").index
+        self.uav_2_r4_idx = self.controller.get_actuator_info("uav_2_r4_joint_motor").index
+
+        return None # TODO init first state with positions of uavs, vel., etc.
 
     
     def step(self, action):
@@ -57,11 +68,15 @@ class UAVSimulator:
     
     def take_action(self, action):
         """Apply the action to the UAV"""
-        self.next_act = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, 0.0, nan)
+        # set uav 1 to position_controller=0, x=0, y=0, z=0.5
+        self.uav_1_destination = (0.0, 0.0, 0.0, 0.5, nan, nan, nan, nan, nan, nan, 0.0, nan)
         self.reply = self.controller.simulate(self.steps_per_call,  
         { 
-            self.px4_input1_idx: self.next_act,
-            self.px4_input2_idx: self.next_act
+            self.px4_input1_idx: self.uav_1_destination,
+            self.uav_2_r1_idx: (400,), 
+            self.uav_2_r2_idx: (400,), 
+            self.uav_2_r3_idx: (-400,),  # front right (neg for upwards)
+            self.uav_2_r4_idx: (-400,),  # back left (neg for upwards)
         })
         
     def get_state(self):
