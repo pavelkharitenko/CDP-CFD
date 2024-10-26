@@ -72,14 +72,7 @@ def plot_all_metrics(all_rewards, episode_lengths, all_actions, action_space_siz
     axs[0, 1].legend()
     axs[0, 1].grid(True)
 
-    # Plot 3: Action distribution (histogram)
-    actions = np.concatenate(all_actions)  # Flatten the list of actions
-    axs[1, 0].hist(actions, bins=np.arange(action_space_size + 1) - 0.5, rwidth=0.8, color="green")
-    axs[1, 0].set_xlabel("Action")
-    axs[1, 0].set_ylabel("Frequency")
-    axs[1, 0].set_title("Action Distribution")
-    axs[1, 0].set_xticks(np.arange(action_space_size))
-    axs[1, 0].grid(True)
+    
 
     # Plot 4: Cumulative rewards
     cumulative_rewards = np.cumsum(all_rewards)

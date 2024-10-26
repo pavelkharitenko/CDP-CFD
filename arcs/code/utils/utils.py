@@ -1,9 +1,8 @@
-import torch, pickle, randomname, sys
+import torch, pickle, randomname, sys, math
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random as rnd
-import torch, sys
 sys.path.append('../../uav/')
 from uav import *
 sys.path.append("../../observers/ndp/")
@@ -637,6 +636,101 @@ def plot_so2_xy_slice(model):
     plt.show()
 
 
+def plot_so2_zy_xy_slices(model):
+    # Plot xy-slices at different Z-values:
+    xy_plane_z_samples = [-1.0, -0.5, 0.0, 0.5, 1.0 ]
+    xy_range = 1.0 # size of XY plane
+    plane_res = 200 # number of points sampled for plotting in one dimension
+
+    color="autumn"
+    test_f = []
+    fig, ax = plt.subplots(2, len(xy_plane_z_samples), sharex=True, sharey=True)
+
+    
+    model.eval()
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    
+    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
+
+    all_imgs = [] # save all
+
+    # loop over Z-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 9])
+        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                dx = [xy_samples[i], xy_samples[j], z_point]
+                vB = [0.0, 0.1, 0.0]
+                vA = [0.0, 0.0, 0.0]
+
+                hx = np.array(h(dx, vB, vA))
+
+                with torch.no_grad():
+                    hx = torch.from_numpy(hx).to(torch.float32).cuda()
+
+                    model_pred = model(hx)
+                    pred_dw = F(dx, model_pred)
+                    
+                    plot_f[i, j] = pred_dw[2].cpu()
+                    plotted_forces.append(pred_dw[2].cpu().numpy())
+               
+
+        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[0][idx].set_title(f"Z = {z_point}m")
+        
+    
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    # plot xz-slice
+
+    # loop over Y-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 9])
+        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                dx = [xy_samples[i], z_point, xy_samples[j]]
+                vB = [0.0, 0.1, 0.0]
+                vA = [0.0, 0.0, 0.0]
+
+                hx = np.array(h(dx, vB, vA))
+
+                with torch.no_grad():
+                    hx = torch.from_numpy(hx).to(torch.float32).cuda()
+
+                    model_pred = model(hx)
+                    pred_dw = F(dx, model_pred)
+                    
+                    plot_f[i, j] = pred_dw[2].cpu()
+                    plotted_forces.append(pred_dw[2].cpu().numpy())
+               
+
+        im = ax[1][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[1][idx].set_title(f"Y = {z_point}m")
+
+    # add the bar and fix min-max colormap
+    for im in all_imgs:
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    plt.xlabel('Forces in Newton (N)')
+    
+    plt.show()
 
 
 
@@ -911,8 +1005,6 @@ def compute_residual_dw_forces(uav):
 
 
 
-
-
     
 def plan_next_coords(sample_distance, safety_distance, self_pos, other_uav_pos):
     xmax, xmin = other_uav_pos[0] + sample_distance, other_uav_pos[0] - sample_distance
@@ -997,4 +1089,133 @@ def evaluate_zy_force_curvature(models, rel_state_vectors):
     return predicted_z_curves
 
 
-        
+def euler_angles_to_quaternion(roll, pitch, yaw):
+    """
+    Converts Euler angles (attitude angles) to a quaternion.
+    
+    Parameters:
+    roll -- Roll angle [-pi,pi] (in degrees)
+    pitch -- Pitch angle [-pi/2, pi/2] (in degrees)
+    yaw -- Yaw angle (in degrees)
+    
+    Returns:
+    (qx, qy, qz, qw) -- Corresponding quaternion
+    """
+    # Convert to raidans
+    roll *= np.pi/180
+    pitch *= np.pi/180
+    yaw *= np.pi/180
+
+    # Calculate half-angles
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+
+    # Calculate quaternion
+    qw = cr * cp * cy + sr * sp * sy
+    qx = sr * cp * cy - cr * sp * sy
+    qy = cr * sp * cy + sr * cp * sy
+    qz = cr * cp * sy - sr * sp * cy
+
+    return qx, qy, qz, qw
+
+
+def thrust_to_throttle_p005_mrv80(thrust):
+    """Function to calculate throttle for a given thrust"""
+    # derived experimentally
+    a = -19.22227272364371
+    b = 97.19994628748094 
+    c = -4.834594920884268
+    discriminant = b**2 - 4 * a * (c - thrust)
+    if discriminant < 0:
+        raise ValueError("No real solution for this thrust value.")
+    
+    # Calculate both solutions
+    throttle1 = (-b + math.sqrt(discriminant)) / (2 * a)
+    # Choose the valid throttle value within the range [0, 1]
+    
+    return throttle1
+
+def thrust_to_throttle_p005_mrv80_trimmed(thrust):
+    """Function to calculate throttle for a given thrust"""
+    # derived experimentally
+    a = 3.97258852219884 
+    b = 76.24463844772076 
+    c = -0.7139906639341799
+    discriminant = b**2 - 4 * a * (c - thrust)
+    if discriminant < 0:
+        raise ValueError("No real solution for this thrust value.")
+    
+    # Calculate both solutions
+    throttle1 = (-b + math.sqrt(discriminant)) / (2 * a)
+    # Choose the valid throttle value within the range [0, 1]
+    
+    return throttle1
+
+def thrust_to_throttle_p005_mrv80_close_range(thrust):
+    """Function to calculate throttle for a given thrust, accurate for 25-55N"""
+    # derived experimentally
+    a = 12.423021824928965
+    b = 66.19728270905844
+    c = 1.990096671985906
+    discriminant = b**2 - 4 * a * (c - thrust)
+    if discriminant < 0:
+        raise ValueError("No real solution for this thrust value.")
+    
+    # Calculate both solutions
+    throttle1 = (-b + math.sqrt(discriminant)) / (2 * a)
+    # Choose the valid throttle value within the range [0, 1]
+    
+    return throttle1
+
+
+def test_throttle_approximators():
+    forces = np.linspace(0,100,10000)
+    plt.plot(forces, [thrust_to_throttle_p005_mrv80(thrust) for thrust in  forces], label="fitted model")
+    plt.plot(forces, [thrust_to_throttle_p005_mrv80_trimmed(thrust) for thrust in forces], label="trimmed model")
+    plt.plot(forces, [thrust_to_throttle_p005_mrv80_close_range(thrust) for thrust in forces], label="ranged model")
+
+    plt.xlabel("thrust")
+    plt.ylabel("throttle")
+    plt.title("Throttle vs. Thrust (different models Fit)")
+    plt.legend()
+    plt.show()
+
+def rotation_matrix_to_vector(x, y, z):
+    # Step 1: Normalize the desired vector
+    v = np.array([x, y, z])
+    norm_v = np.linalg.norm(v)
+    v_hat = v / norm_v  # Unit vector
+
+    # Step 2: Calculate the rotation axis (cross product)
+    z_axis = np.array([0, 0, 1])
+    u = np.cross(z_axis, v_hat)  # Rotation axis
+    u_norm = np.linalg.norm(u)  # Norm of the rotation axis
+
+    # If the rotation axis is zero (v_hat is already aligned with z_axis)
+    if u_norm == 0:
+        return np.eye(3)  # No rotation needed, return identity matrix
+
+    # Step 3: Compute the rotation angle
+    cos_theta = v_hat[2]  # Dot product with z_axis
+    theta = np.arccos(cos_theta)
+
+    # Step 4: Construct the skew-symmetric matrix K
+    u_hat = u / u_norm  # Normalize the rotation axis
+    K = np.array([[0, -u_hat[2], u_hat[1]],
+                  [u_hat[2], 0, -u_hat[0]],
+                  [-u_hat[1], u_hat[0], 0]])
+
+    # Compute the rotation matrix using Rodrigues' rotation formula
+    I = np.eye(3)  # Identity matrix
+    R = I + np.sin(theta) * K + (1 - cos_theta) * np.dot(K, K)
+
+    return R
+
+# Example usage
+x, y, z = 1, 2, 3  # Desired vector
+R = rotation_matrix_to_vector(x, y, z)
+print("Rotation Matrix:\n", R)

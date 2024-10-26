@@ -11,7 +11,7 @@
         name: "p600"
         initial_position:
         - 0
-        - 1.5
+        - 1.25
         - 0
         initial_rotation:
           angle_radians: 0.0
@@ -32,7 +32,7 @@
         name: "p600_2"
         initial_position:
         - 0
-        - -1.5
+        - -1.25
         - 0.02
         initial_rotation:
           angle_radians: 0.0

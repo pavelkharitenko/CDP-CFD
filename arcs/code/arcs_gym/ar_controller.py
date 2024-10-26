@@ -1,51 +1,46 @@
 from simcontrol import simcontrol2
+import numpy as np
 nan = float('NaN')
 
 
 class UAVSimulator:
     def __init__(self):
+        # init simcontrol
         self.port = 25556
-        self.control_frequency = 200 # in Hz
-        self.sim_max_duration = 0.8 # in seconds
-        self.state = None  # Current state of the UAV
-        self.done = False  # Simulation end flag
-        self.reset()       # Initialize the simulation
-        
-    def reset(self):
-        """Reset the simulator to the initial state"""
-        self.state = self.get_initial_state()
-        self.done = False
-        return self.state
-
-    def get_initial_state(self):
-        """Init interface to AR, to AR's UAV's actuators, sensors, etc."""
-        # get input/output control handle from AR sim
         self.controller = simcontrol2.Controller("localhost", self.port)
+        self.controller.clear()
         self.controller.start()
+        self.state = None  # Current state of the UAV
 
         # init time params
+        self.sim_max_duration = 1.5 # in seconds
+        self.control_frequency = 200 # in Hz
         self.time_step = self.controller.get_time_step()
         self.total_sim_time_steps = self.sim_max_duration / self.time_step
         self.steps_per_call = int(1.0 / self.control_frequency / self.time_step)
-        self.curr_sim_time = 0.0
-        self.curr_step = 0
         
-
         # init sensors
         self.imu1_idx = self.controller.get_sensor_info('imu1').index
         self.imu2_idx = self.controller.get_sensor_info('imu2').index
-
         # init actuators
         # px4 controller handle
         self.px4_input1_idx = self.controller.get_actuator_info('controller1').index
-
         # RL agent's UAV2 rotor actuators handles
         self.uav_2_r1_idx = self.controller.get_actuator_info("uav_2_r1_joint_motor").index
         self.uav_2_r2_idx = self.controller.get_actuator_info("uav_2_r2_joint_motor").index
         self.uav_2_r3_idx = self.controller.get_actuator_info("uav_2_r3_joint_motor").index
         self.uav_2_r4_idx = self.controller.get_actuator_info("uav_2_r4_joint_motor").index
 
-        return None # TODO init first state with positions of uavs, vel., etc.
+        self.reset()       # Initialize the simulation
+        
+    def reset(self):
+        """Reset the simulator to the initial state"""
+        self.controller.clear()
+        self.controller.start()
+        self.curr_sim_time = 0.0
+        self.curr_step = 0
+        self.done = False
+        return np.array([0., 0., 0., 0.,-1.5,0., 0.6, 0., 0.], dtype=np.float32) # TODO init first state with positions of uavs, vel., etc.
 
     
     def step(self, action):
@@ -63,8 +58,9 @@ class UAVSimulator:
         reward = self.calculate_reward(self.state)  
         self.done = self.check_done()  # Check if episode has ended
         truncated = False # no logic here yet
-        info = {}
-        return self.state, reward, self.done, truncated, info
+        info = self.curr_sim_time
+
+        return self.state, reward, self.done, info
     
     def take_action(self, action):
         """Apply the action to the UAV"""
@@ -73,26 +69,41 @@ class UAVSimulator:
         self.reply = self.controller.simulate(self.steps_per_call,  
         { 
             self.px4_input1_idx: self.uav_1_destination,
-            self.uav_2_r1_idx: (400,), 
-            self.uav_2_r2_idx: (400,), 
-            self.uav_2_r3_idx: (-400,),  # front right (neg for upwards)
-            self.uav_2_r4_idx: (-400,),  # back left (neg for upwards)
+            self.uav_2_r1_idx: (action[0],), 
+            self.uav_2_r2_idx: (action[0],), 
+            self.uav_2_r3_idx: (action[0],),  # front right (neg for upwards)
+            self.uav_2_r4_idx: (action[0],),  # back left (neg for upwards)
         })
         
     def get_state(self):
-        """Return the current state of the UAV"""
-        imu1_data  = self.reply.get_sensor_output(self.imu1_idx)
-        imu2_data  = self.reply.get_sensor_output(self.imu2_idx)
+        """Return the nessarary states of the UAVs and time"""
+        imu_other = self.reply.get_sensor_output(self.imu1_idx)
+        imu_self  = self.reply.get_sensor_output(self.imu2_idx)
+
+        # return steering UAVs x,z pos. and y vel.
+        xz_pos_y_vel_self = np.array([imu_self[0], imu_self[2], imu_self[7]])
+
+        # return as well rel. pos and vel. of neighbor UAV
+        rel_pos_vec = np.array(imu_other[:3]) - np.array(imu_self[:3])
+        rel_vel_vec = np.array(imu_other[6:9]) - np.array(imu_self[6:9])
 
 
-        
-        return [imu1_data, imu2_data], self.curr_sim_time, self.curr_step
+        # return observation as well time and steps
+        observation = np.concatenate((xz_pos_y_vel_self, rel_pos_vec, rel_vel_vec), dtype=np.float32)
+        print("#### obser", observation)
+        return observation
     
     def calculate_reward(self, state):
         """Calculate reward based on the state"""
-        # Define reward function here based on the state
         reward = 0
-        # For example: reward = -1 if UAV crashes, reward = 10 if UAV reaches goal, etc.
+        vy_ref = 2.0
+
+        x_err = -(state[0]**2)
+        z_err = -(state[1]**2)
+        vy_err = -np.square(vy_ref - state[2])
+        collision_penalty = -100 if np.linalg.norm(state[3:6]) < 0.1 else 0 # if collision with other uav
+
+        reward  = x_err + z_err + vy_err + collision_penalty
         return reward
     
     def check_done(self):
@@ -100,11 +111,15 @@ class UAVSimulator:
 
         if not self.curr_sim_time < self.sim_max_duration: 
             # time exceeded, close ar controller and return
-            self.controller.clear()
-            self.controller.close()
+            #self.controller.clear()
+            
             return True
         else: 
             return False
+
+    def close(self):
+        self.controller.clear()
+        self.controller.close()
     
     
 

@@ -6,9 +6,9 @@ sys.path.append('../../observers/')
 sys.path.append('../../uav/')
 sys.path.append('../../utils/')
 
-from SO2.model import ShallowEquivariantPredictor
-from ndp.model import DWPredictor
-from neuralswarm.model import NeuralSwarmPredictor
+#from SO2.model import ShallowEquivariantPredictor
+##from ndp.model import DWPredictor
+#from neuralswarm.model import NeuralSwarmPredictor
 
 from uav import *
 from utils import *
@@ -76,8 +76,8 @@ while curr_sim_time < sim_max_duration:
         #px4_input_1 = (0.0, nan,nan,nan, 0.0, 0.0, 0.0, nan, nan, nan, 0.0, nan) 
         px4_input_1 = (0.0, 0.0, -1, 0.6, nan, nan, nan, nan, nan, nan, 0.0, nan) 
     else:
-        # keep position
-        px4_input_1 = (0.0, nan, nan, 0.6, 0.0, y_velocity, nan, nan, nan, nan, 0.0, nan) 
+        # keep set all acc to 0
+        px4_input_1 = (0.0, nan, nan, 0.6, nan, y_velocity, nan, 0.0, 0.0, 0.0, 0.0, nan) 
         #px4_input_1 = (0.0, nan,nan,nan, 0.0, 0.0, 0.0, nan, nan, nan, 0.0, nan) 
             
     # second drone just hovering
@@ -119,6 +119,7 @@ print("Control experiment ended.")
 
 print("Collected ", len(rel_state_vector_list), "samples of data.")
 
+exit(0)
 
 # Plot recorded and predicted forces
 

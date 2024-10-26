@@ -42,13 +42,13 @@
           - 1.0
         joint_velocities:
           p600__rotor_0_joint:
-            - 320.0
+            - 0.0
           p600__rotor_1_joint:
-            - 320.0
+            - 0.0
           p600__rotor_2_joint:
-            - -320.0
+            - -0.0
           p600__rotor_3_joint:
-            - -320.0
+            - -0.0
     
      
   fluid:
