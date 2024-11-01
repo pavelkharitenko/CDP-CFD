@@ -3,10 +3,10 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random as rnd
-sys.path.append('../../uav/')
+sys.path.append('../uav/')
 from uav import *
-sys.path.append("../../observers/ndp/")
-sys.path.append("../../observers/SO2/")
+sys.path.append("../observers/ndp/")
+sys.path.append("../observers/SO2/")
 from model import *
 
 
@@ -1184,38 +1184,14 @@ def test_throttle_approximators():
     plt.legend()
     plt.show()
 
-def rotation_matrix_to_vector(x, y, z):
-    # Step 1: Normalize the desired vector
-    v = np.array([x, y, z])
-    norm_v = np.linalg.norm(v)
-    v_hat = v / norm_v  # Unit vector
 
-    # Step 2: Calculate the rotation axis (cross product)
-    z_axis = np.array([0, 0, 1])
-    u = np.cross(z_axis, v_hat)  # Rotation axis
-    u_norm = np.linalg.norm(u)  # Norm of the rotation axis
+def rps_to_thrust_p005_mrv80(mean_rps):
+    """Function to calculate thrust for given avg. rps, accurate for 340-430rps"""
+    a = 0.00019339212
+    b = 0.01897496901
+    c = -4.52623347271
+    
+    return a*mean_rps**2 + b* mean_rps + c
 
-    # If the rotation axis is zero (v_hat is already aligned with z_axis)
-    if u_norm == 0:
-        return np.eye(3)  # No rotation needed, return identity matrix
 
-    # Step 3: Compute the rotation angle
-    cos_theta = v_hat[2]  # Dot product with z_axis
-    theta = np.arccos(cos_theta)
-
-    # Step 4: Construct the skew-symmetric matrix K
-    u_hat = u / u_norm  # Normalize the rotation axis
-    K = np.array([[0, -u_hat[2], u_hat[1]],
-                  [u_hat[2], 0, -u_hat[0]],
-                  [-u_hat[1], u_hat[0], 0]])
-
-    # Compute the rotation matrix using Rodrigues' rotation formula
-    I = np.eye(3)  # Identity matrix
-    R = I + np.sin(theta) * K + (1 - cos_theta) * np.dot(K, K)
-
-    return R
-
-# Example usage
-x, y, z = 1, 2, 3  # Desired vector
-R = rotation_matrix_to_vector(x, y, z)
-print("Rotation Matrix:\n", R)
+#print(rps_to_thrust_p005_mrv80(350))

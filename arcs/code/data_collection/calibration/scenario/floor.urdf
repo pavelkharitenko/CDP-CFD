@@ -5,7 +5,7 @@
   <link name="main">
     <visual>
       <geometry>
-        <mesh filename="meshes/floor.stl" scale="1 2 1"/>
+        <mesh filename="meshes/floor.stl" scale="0.3 0.3 0.3"/>
       </geometry>
     </visual>
 

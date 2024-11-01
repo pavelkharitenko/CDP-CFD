@@ -12,7 +12,7 @@
         initial_position:
         - 0
         - -1.5
-        - 0.5
+        - 0.6
         initial_rotation:
           angle_radians: 0.0
           axis:
@@ -21,13 +21,13 @@
           - 0.0
         joint_velocities:
           p600__rotor_0_joint:
-            - 320.0
+            - 340.0
           p600__rotor_1_joint:
-            - 320.0
+            - 340.0
           p600__rotor_2_joint:
-            - -320.0
+            - -340.0
           p600__rotor_3_joint:
-            - -320.0
+            - -340.0
       - file_path: "p600_2.urdf"
         name: "p600_2"
         initial_position:

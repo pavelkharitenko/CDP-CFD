@@ -11,23 +11,17 @@ from utils import *
 def main(controller):
     port = 25556
     SIM_DURATION = 15.0
-    spin_up_time = 5.0
+    spin_up_time = 3.0
     measurement_duration = 10.0 # sim seconds
-    throttle_ds = .001
-    throttle_measurements = np.round(np.arange(0.362, 0.366 + throttle_ds, throttle_ds), 3)
+    rotor_ds = 1.0
+    rotor_measurements = np.round(np.arange(401, 430 + rotor_ds, rotor_ds), 1)
     #throttle_measurements = [0.5]
 
     # connect to simulators controller
     controller = simcontrol2.Controller("localhost", port)
     controller.clear()
 
-    ext_force_sensors = ["force_sensor_body_z", "force_sensor_rotor_1_z", "force_sensor_rotor_2_z", "force_sensor_rotor_3_z", "force_sensor_rotor_4_z"]
-    jft_sensors = ["jft_sensor_body", "jft_sensor_imu",  "jft_sensor_rotor1", "jft_sensor_rotor2", "jft_sensor_rotor3", "jft_sensor_rotor4"]
-
-    # setup UAVs
-    uav_2_ext_z_force_sensors = ["uav_2_" + ext_sen_name for ext_sen_name in ext_force_sensors]
-    uav_2_jft_sensors = ["uav_2_" + ext_sen_name for ext_sen_name in jft_sensors]
-    uav_2 = UAV("sufferer", controller, "controller2", "imu2", uav_2_ext_z_force_sensors, uav_2_jft_sensors)
+    
 
     # special variables
 
@@ -36,6 +30,11 @@ def main(controller):
     r2_joint_sensor_idx = controller.get_sensor_info("uav_2_r2_joint_sensor").index
     r3_joint_sensor_idx = controller.get_sensor_info("uav_2_r3_joint_sensor").index
     r4_joint_sensor_idx = controller.get_sensor_info("uav_2_r4_joint_sensor").index
+
+    uav_2_r1_idx = controller.get_actuator_info("uav_2_r1_joint_motor").index
+    uav_2_r2_idx = controller.get_actuator_info("uav_2_r2_joint_motor").index
+    uav_2_r3_idx = controller.get_actuator_info("uav_2_r3_joint_motor").index
+    uav_2_r4_idx = controller.get_actuator_info("uav_2_r4_joint_motor").index
 
 
     
@@ -64,29 +63,34 @@ def main(controller):
 
 
     # each iteration sends control signal
-    for throttle_meas in throttle_measurements:
+    for rotor_meas in rotor_measurements:
 
-        print(f"Measuring throttle {throttle_meas}/{throttle_measurements[-1]}")
+        print(f"Measuring rps {rotor_meas}/{rotor_measurements[-1]}")
         curr_sim_time = 0
         curr_step = 0
 
-        current_throttle_measurements = []
+        current_rotor_measurements = []
         current_r1_measurements = []
         current_r2_measurements = []
         current_r3_measurements = []
         current_r4_measurements = []
 
 
-        while curr_sim_time <= measurement_duration:
+        while curr_sim_time <= measurement_duration + spin_up_time:
         
-            px4_input_2 = (3.0, 0, 0, 0, throttle_meas) 
+             
 
             
-            reply = controller.simulate(steps_per_call,  { uav_2.px4_idx: px4_input_2})
-            uav_2.update(reply, curr_sim_time)
+            reply = controller.simulate(steps_per_call,  { 
+                                                    uav_2_r1_idx: (rotor_meas,), 
+                                                   uav_2_r2_idx: (rotor_meas,), 
+                                                   uav_2_r3_idx: (-rotor_meas,),  # front right
+                                                   uav_2_r4_idx: (-rotor_meas,),  # back left})
+            })
+            
             
             if curr_sim_time >= spin_up_time:
-                current_throttle_measurements.append(reply.get_sensor_output(body_jft_sensor_idx)[2])
+                current_rotor_measurements.append(-reply.get_sensor_output(body_jft_sensor_idx)[2])
                 current_r1_measurements.append(reply.get_sensor_output(r1_joint_sensor_idx)[0])
                 current_r2_measurements.append(reply.get_sensor_output(r2_joint_sensor_idx)[0])
                 current_r3_measurements.append(reply.get_sensor_output(r3_joint_sensor_idx)[0])
@@ -99,7 +103,7 @@ def main(controller):
             curr_step += steps_per_call
             #print(curr_sim_time)
 
-        raw_body_jft_forces_list.append(current_throttle_measurements)
+        raw_body_jft_forces_list.append(current_rotor_measurements)
         print("avg. force recorded:", np.round(np.mean(raw_body_jft_forces_list[-1]),2))
         rotor_1_rps_list.append(current_r1_measurements)
         rotor_2_rps_list.append(current_r2_measurements)
@@ -111,13 +115,6 @@ def main(controller):
         controller.clear()
         controller.start()
 
-           
-        
-        
-
-        
-        
-        
 
 
     # Clear and close simulator
@@ -127,11 +124,11 @@ def main(controller):
 
     for idx, force_meas in enumerate(raw_body_jft_forces_list):
         
-        if idx % 1 == 0:
+        if idx % 5 == 0:
             adjusted_jft_forces = np.array(force_meas)    # - jft_bias
             fig = plt.subplot()
-            fig.plot(adjusted_jft_forces, label=f"{throttle_measurements[idx]}")
-            fig.plot(np.full(len(adjusted_jft_forces), np.mean(adjusted_jft_forces)), label=f"{throttle_measurements[idx]} - mean")
+            fig.plot(adjusted_jft_forces, label=f"{rotor_measurements[idx]}")
+            fig.plot(np.full(len(adjusted_jft_forces), np.mean(adjusted_jft_forces)), label=f"{rotor_measurements[idx]} - mean")
 
 
     plt.legend()
@@ -156,13 +153,13 @@ def main(controller):
         ax.axis('off')
         
         # Create a table from the data
-        table_data = [["Throttle Value", 
+        table_data = [["Rps value", 
                        f"Average Force (N) over {measurement_duration}s\n(after some spinup time)", 
                        "r1 avg. rps", "r2 avg. rps","r3 avg. rps","r4 avg. rps",
                        "mean rotor avg rps"
                        ]]
         for i, avg in enumerate(data):
-            table_data.append([throttle_measurements[i], 
+            table_data.append([rotor_measurements[i], 
                                f"{avg:.4f}", 
                                f"{r1_averages[i]:.4f}", f"{r2_averages[i]:.4f}",f"{r3_averages[i]:.4f}",f"{r4_averages[i]:.4f}",
                                f"{rotors_avgs[i]:.4f}"])
@@ -181,6 +178,10 @@ def main(controller):
 
     # Plot the table
     plot_table(force_averages)
+
+    plt.scatter(rotor_measurements, force_averages)
+    plt.show()
+    np.savez("rotor_thrust_map_005_80_rps361_400_430.npz", rotor_measurements=rotor_measurements, force_averages=force_averages)
     
 
 

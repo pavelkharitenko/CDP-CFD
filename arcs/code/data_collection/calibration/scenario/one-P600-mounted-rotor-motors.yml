@@ -7,7 +7,7 @@
 
   rigid_bodies:
     skeletons:
-      - file_path: "p600_2_mounted.urdf"
+      - file_path: "p600_2_mounted_no_body.urdf"
         name: "p600_2_mounted"
         initial_position:
         - 0
@@ -145,71 +145,28 @@
 
 
 
-    - type: "MulticopterController"
-      name: "controller2"
-      imu_name: "imu2"
-      fl_motor_name: "fl2"
-      fr_motor_name: "fr2"
-      bl_motor_name: "bl2"
-      br_motor_name: "br2"
-      mixer:
-        thrust_to_pwm_power: 1.0
-        yaw_weight: 1.0
-      rate_controller:
-        control_frequency: 1000.0
-        k_proportional_gain:
-          roll: 0.3
-          pitch: 0.3
-          yaw: 0.4
-        k_integral_gain:
-          roll: 1.0
-          pitch: 1.0
-          yaw: 1.0
-        k_derivative_gain:
-          roll: 0.05
-          pitch: 0.05
-          yaw: 0.0
-        integral_limit:
-          roll: 0.3
-          pitch: 0.3
-          yaw: 0.3
-      attitude_controller:
-        control_frequency: 250.0
-        proportional_gain:
-          roll: 5.0
-          pitch: 5.0
-          yaw: 4.0
-        max_output_angular_rate:
-          roll: 5.0
-          pitch: 5.0
-          yaw: 4.0
-        yaw_weight: 0.4
-      position_controller:
-        control_frequency: 50.0
-        velocity_proportional_gain:
-          - 1.8
-          - 1.8
-          - 4.0
-        velocity_integral_gain:
-          - 0.4
-          - 0.4
-          - 1.0
-        velocity_derivative_gain:
-          - 0.2
-          - 0.2
-          - 0.4
-        max_tilt: 0.4363 # 25 degrees
-        hover_thrust: 0.45
-        min_thrust: 0.1
-        max_thrust: 0.9
-        horizontal_thrust_margin: 0.6
-        position_proportional_gain:
-          - 0.95
-          - 0.95
-          - 1.0
-        max_horizontal_velocity: 12.0
-        max_up_velocity: 3.0
-        max_down_velocity: 1.5
+
+    # UAV 2 mounted rotor motors
+    - type: "Joint"
+      name: "uav_2_r1_joint_motor"
+      target_skeleton_name: "p600_2_mounted"
+      target_joint_name: "p600__rotor_0_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_2_r2_joint_motor"
+      target_skeleton_name: "p600_2_mounted"
+      target_joint_name: "p600__rotor_1_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_2_r3_joint_motor"
+      target_skeleton_name: "p600_2_mounted"
+      target_joint_name: "p600__rotor_2_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_2_r4_joint_motor"
+      target_skeleton_name: "p600_2_mounted"
+      target_joint_name: "p600__rotor_3_joint"
+      mode: "Velocity"
       
 
   sensors:
