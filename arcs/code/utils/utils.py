@@ -1123,66 +1123,6 @@ def euler_angles_to_quaternion(roll, pitch, yaw):
     return qx, qy, qz, qw
 
 
-def thrust_to_throttle_p005_mrv80(thrust):
-    """Function to calculate throttle for a given thrust"""
-    # derived experimentally
-    a = -19.22227272364371
-    b = 97.19994628748094 
-    c = -4.834594920884268
-    discriminant = b**2 - 4 * a * (c - thrust)
-    if discriminant < 0:
-        raise ValueError("No real solution for this thrust value.")
-    
-    # Calculate both solutions
-    throttle1 = (-b + math.sqrt(discriminant)) / (2 * a)
-    # Choose the valid throttle value within the range [0, 1]
-    
-    return throttle1
-
-def thrust_to_throttle_p005_mrv80_trimmed(thrust):
-    """Function to calculate throttle for a given thrust"""
-    # derived experimentally
-    a = 3.97258852219884 
-    b = 76.24463844772076 
-    c = -0.7139906639341799
-    discriminant = b**2 - 4 * a * (c - thrust)
-    if discriminant < 0:
-        raise ValueError("No real solution for this thrust value.")
-    
-    # Calculate both solutions
-    throttle1 = (-b + math.sqrt(discriminant)) / (2 * a)
-    # Choose the valid throttle value within the range [0, 1]
-    
-    return throttle1
-
-def thrust_to_throttle_p005_mrv80_close_range(thrust):
-    """Function to calculate throttle for a given thrust, accurate for 25-55N"""
-    # derived experimentally
-    a = 12.423021824928965
-    b = 66.19728270905844
-    c = 1.990096671985906
-    discriminant = b**2 - 4 * a * (c - thrust)
-    if discriminant < 0:
-        raise ValueError("No real solution for this thrust value.")
-    
-    # Calculate both solutions
-    throttle1 = (-b + math.sqrt(discriminant)) / (2 * a)
-    # Choose the valid throttle value within the range [0, 1]
-    
-    return throttle1
-
-
-def test_throttle_approximators():
-    forces = np.linspace(0,100,10000)
-    plt.plot(forces, [thrust_to_throttle_p005_mrv80(thrust) for thrust in  forces], label="fitted model")
-    plt.plot(forces, [thrust_to_throttle_p005_mrv80_trimmed(thrust) for thrust in forces], label="trimmed model")
-    plt.plot(forces, [thrust_to_throttle_p005_mrv80_close_range(thrust) for thrust in forces], label="ranged model")
-
-    plt.xlabel("thrust")
-    plt.ylabel("throttle")
-    plt.title("Throttle vs. Thrust (different models Fit)")
-    plt.legend()
-    plt.show()
 
 
 def rps_to_thrust_p005_mrv80(mean_rps):
@@ -1190,8 +1130,12 @@ def rps_to_thrust_p005_mrv80(mean_rps):
     a = 0.00019339212
     b = 0.01897496901
     c = -4.52623347271
+
+    # for single rotor: thrust = c * w**2 => c = 5.29513e-05
     
     return a*mean_rps**2 + b* mean_rps + c
 
 
-#print(rps_to_thrust_p005_mrv80(350))
+# thrust = c1 * w**2 => c1 = thrust / w**2
+#w = 375
+#print(rps_to_thrust_p005_mrv80(w)/(4*w**2))

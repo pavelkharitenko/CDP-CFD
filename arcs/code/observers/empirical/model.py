@@ -20,8 +20,6 @@ class EmpiricalPredictor():
         self.c_rad = 1.0
         
         
-    
-        
 
     def velocity_center(self, z):
         induced_vel = np.sqrt(self.T / (2*self.rho*self.Ap))
@@ -34,25 +32,64 @@ class EmpiricalPredictor():
         
         return vel
     
-    def F_drag(self,z,r, grid_points, cell_size):
+    def F_drag(self,z,r, grid_points, cell_size, uav_1, uav_2):
         f_int = 0
         A_cell = cell_size**2
-        grid_points = [[-0.088528,  0.1035  ],
-                        [-0.118528,  0.1335  ],
-                        [-0.148528,  0.1635  ],
-                        [-0.208528,  0.1935  ],
-                        [-0.178528,  0.1935  ],
-                        [-0.208528,  0.2235  ]]
+        #grid_points = [[-0.088528,  0.1035  ], ...]
+                        
         
         for grid_pnt in grid_points:
             # TODO compute absolute x,y gridpoint position, then substract to 
-            x, y = grid_pnt
-            radius = np.sqrt(x**2 + y**2)
-            f_cell = A_cell * 0.5 * self.Cd * self.pho * self.velocity_field(relative_z, radius)
+            x, y = uav_2.rot @ grid_pnt
+            x_abs, y_abs = x + uav_2.pos.x, y + uav_2.pos.y
+            # horizontal separation from uav 1
+            r_dash = np.sqrt((uav_1.pos.x - x_abs)**2 + (uav_1.pos.y - y_abs) **2)
+            # vertical separation from uav 1
+            z_dash = uav_1.pos.z - uav_2.pos.z
+            f_cell = A_cell * 0.5 * self.Cd * self.pho * self.velocity_field(z_dash, r_dash)**2
             f_int += f_cell
         
 
         return np.array([0.0,0.0,-1.0]) * f_int
+    
+    def T_drag(self, z, r, grid_points, cell_size, uav_1, uav_2):
+        torque_int = 0
+        A_cell = cell_size**2
+        #grid_points = [[-0.088528,  0.1035  ], ...]
+                        
+        
+        for grid_pnt in grid_points:
+            # rotate gridpoint vector to uav frame
+            x, y, z = uav_2.rot @ np.array([grid_pnt[0], grid_pnt[1], 0]) # rotate correctly to 
+            x_abs, y_abs, z_abs = x + uav_2.pos.x, y + uav_2.pos.y, z + uav_2.pos.z
+            z_dash = uav_1.pos.z - uav_2.pos.z
+            # horizontal separation from uav 1
+            r_dash = np.sqrt((uav_1.pos.x - x_abs)**2 + (uav_1.pos.y - y_abs) **2)
+            
+            # vertical separation from uav 1
+            z_dash = uav_1.pos.z - uav_2.pos.z
+
+            # distance uav 2 center and gridpoint
+            r_dash_abs = np.array([x_abs, y_abs, z_abs])
+            r = np.array([uav_2.pos.x, uav_2.pos.y, uav_2.pos.z])
+            
+            # torque arm
+            t_arm = r_dash_abs - r
+
+            # vertical separation
+            torque_cell = t_arm @ [0,0,-1]*A_cell * 0.5 * self.Cd * self.pho * self.velocity_field(z_dash, r_dash)**2
+            torque_int += torque_cell
+        
+        return torque_int
+
+    def propeller_thrust_change(self, prop_speed, oncoming_vel):
+        
+        #bv is thrust_delay_coefficient
+        bv = 3.7 * 10e-7
+        return -bv * prop_speed * oncoming_vel**2
+    
+    def propeller_thrust_change_torque(self):
+        pass
 
 
     def __call__(self, uav_1_x, uav_2_x):
