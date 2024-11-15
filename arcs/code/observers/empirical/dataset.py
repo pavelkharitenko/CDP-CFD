@@ -3,7 +3,7 @@ import torch, sys
 sys.path.append('../../utils/')
 from utils import *
 
-class NSDataset(torch.utils.data.Dataset):
+class EmpricialDataset():
     def __init__(self, experiment_paths, from_both_uavs=False):
         self.exp_paths = experiment_paths
         if from_both_uavs:
@@ -43,8 +43,7 @@ class NSDataset(torch.utils.data.Dataset):
             
             
     
-        self.x =  torch.tensor(x).to(torch.float32)
-        self.y =  torch.tensor(y).to(torch.float32)
+        
 
         self.N = len(self.x)
 

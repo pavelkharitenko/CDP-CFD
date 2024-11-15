@@ -3,11 +3,12 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random as rnd
-sys.path.append('../uav/')
+#sys.path.append('../uav/')
+sys.path.append('../../uav/')
 from uav import *
 sys.path.append("../observers/ndp/")
 sys.path.append("../observers/SO2/")
-from model import *
+#from model import *
 
 
 
@@ -911,7 +912,7 @@ def load_forces_from_dataset(exp_pkl_path):
 def extract_labeled_dataset_ndp(uav_list, bias=None):
     uav_1, uav_2 = uav_list
 
-    title = f"\n (relative from {uav_2.name}'s view: rel_state = {uav_1.name} -  {uav_2.name})"
+    title = f"\n (relative from {uav_2.name}'s view: rel_state = {uav_1.name} - {uav_2.name})"
     rel_states = np.array(uav_1.states) - np.array(uav_2.states)
     rel_state_list = [rel_state[0:6] for rel_state in rel_states]
     dw_force_vectors = []
@@ -979,7 +980,6 @@ def extract_labeled_dataset_ns(uav_list, bias=None):
         
     return rel_state_list, dw_force_vectors
 
-
     
 def compute_residual_dw_forces(uav):
     """
@@ -1002,7 +1002,6 @@ def compute_residual_dw_forces(uav):
     dw_force_vectors = np.array([(0,0,dw_force) for dw_force in dw_forces])
 
     return dw_force_vectors
-
 
 
     

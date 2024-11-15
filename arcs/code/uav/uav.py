@@ -33,7 +33,7 @@ class UAV():
         
     def update(self, reply, timestep):
         self.reply = reply
-        # read pos,vel,acc vectors
+        # read xyz pos, xyz vel, xyz acc, yaw-pitch-roll, rot. quaternions w, x, y, z 
         self.states.append(self.read_sensor(reply, self.imu_idx, [0,1,2, 6,7,8, 12,13,14, 3,4,5, 18,19,20,21]))
         # update external force sensors of body and 5 rotors
         ext_forces_body_r1234 = self.read_multiple_sensors(reply, self.ef_sensor_idxs)
