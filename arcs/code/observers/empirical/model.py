@@ -17,8 +17,8 @@ class EmpiricalPredictor():
         # params for dw model due to drag
         self.Aq = 0.0552503 # uav surface area, square meters
         self.Cd = 1.18 # aerodynamic property of uav (like flat plane)
-        self.Ap = 1 # propeller disk area
-        self.rho = 1.0 # density of air
+        self.Ap = np.pi * 0.195**2 # propeller disk area A = pi * r^2
+        self.rho = 1.204 # air density
 
         self.bias_yaw = np.pi/2.0 # discrepancy cad model and AR orientation
 
@@ -43,24 +43,20 @@ class EmpiricalPredictor():
 
         self.l = 0.3 # uav arm length
         self.L = 2.0*self.l # vehicle size
-        self.c_ax = 1.0 # axial constant
-        self.z0 = 1*self.L # virtual origin
+        self.c_ax = 5.0 # axial constant
+        self.c_rad = 25.0
+        #self.z0 = 1*self.L # virtual origin
+        self.z0 = 0.22
         # with z0 = L and rel_z <0.3, DW force is around 0 to -1N
-        #self.z0 = 0 # virtual origin
 
-        self.c_rad = 1.0
+        self.T = 34.0/4
 
-        self.T = 36
+        #print("Horizontal area", self.A_cell_horizontal*len(self.grid_points))
 
-        print("Horizontal area", self.A_cell_horizontal*len(self.grid_points))
-
-
-        
-        
 
     def velocity_center(self, z):
-        induced_vel = np.sqrt(self.T / (2*self.rho*self.Ap))
-        Vmax = induced_vel* self.c_ax*self.L / (z - self.z0)
+        induced_vel_propeller = np.sqrt(self.T / (2*self.rho*self.Ap))
+        Vmax = induced_vel_propeller * self.c_ax*self.L / (z - self.z0)
 
         return Vmax
 
@@ -69,87 +65,75 @@ class EmpiricalPredictor():
         return vel
     
     def F_drag(self, uav_1_state, uav_2_state, plot=True):
-        Force_total = 0
+        Force_total = np.zeros(3)
         Torque_total = 0
 
         # extract states and rotations
-        u1_x, u1_y, u1_z = uav_1_state[0:3]
-        u2_x, u2_y, u2_z = uav_2_state[0:3]
-        u2_yaw, u2_pitch, u2_roll = uav_2_state[9:12]
+        u1_x, u1_y, u1_z = uav_1_state[0:3] # uav 1 position
+        u2_x, u2_y, u2_z = uav_2_state[0:3] # uav 2 position
+        u2_yaw, u2_pitch, u2_roll = uav_2_state[9:12] # uav 2 orientation
+        b2Rw = R.from_euler('xyz', [u2_roll, u2_pitch, u2_yaw + self.bias_yaw], degrees=False)
 
         # for testing, put position of uav 1 above uav2  -----
         u1_x, u1_y, u1_z = uav_2_state[0:3]
-        u1_y += 0.5
-        u1_z += 0.5
+        #u1_x += 0.25
+        u1_z += 1.0
         # ---
 
-        #b2Rw = R.from_euler('xyz', [0 , 0, 0], degrees=False)
-        b2Rw = R.from_euler('xyz', [u2_roll, u2_pitch, u2_yaw + self.bias_yaw], degrees=False)
-
-        # update cell surface regarding z-Plane
+        # update cell surface regarding z-Plane:
         x_cell_b = b2Rw.apply([self.x_cell_length, 0,0])
         y_cell_b = b2Rw.apply([0,self.y_cell_length, 0])
-
         # 1 compute the normal vector of the cell plane using cross product
         normal_vector = np.cross(x_cell_b, y_cell_b)
-
         # 2 normalize plane's normal vector
         normal_vector = normal_vector / np.linalg.norm(normal_vector)
-
         # 3 compute the cosine of the angle with the Z-axis
         cosine_angle = abs(normal_vector[2])
-
         A_cell_xy_projected = self.A_cell_horizontal * cosine_angle
+        #print("New proj. Acell:", A_cell_xy_projected * len(self.grid_points))
 
-
-        print("New proj. Acell:", A_cell_xy_projected * len(self.grid_points))
 
         if plot:
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
-        
+
+        # iterate discretized points and compute z-force and torque from velocity field model
         for grid_pnt in self.grid_points:
+
+            # extract, rotate and translate gridpoints of uav 2
             x, y, z = grid_pnt[0], grid_pnt[1], 0
             x, y, z = b2Rw.apply([x,y,z])
-            x,y,z = x + u2_x, y + u2_y, z + u2_z
+            x, y, z = x + u2_x, y + u2_y, z + u2_z
 
-            # horizontal separation from uav 1
+            # torque arm: distance grid point and uav 2 center
+            torque_arm = np.array([x, y, z]) - np.array([u2_x, u2_y, u2_z])
+
+            # horizontal separation of grid point from uav 1
             r_dash = np.sqrt((u1_x - x)**2 + (u1_y - y)**2)
-
-            # compute torque distance vector
-            r_dash_abs = np.array([x, y, z])
-            r = np.array([u2_x, u2_y, u2_z]) # uav 2 center
-            # torque arm
-            torque_arm = r_dash_abs - r
-            
-
-
-
             # vertical separation from uav 1
             z_dash = u1_z - u2_z
 
-            # compute f acting on one gridpoint
+            # compute force f acting on one gridpoint by integrating velocity field at this cell
             f_cell = A_cell_xy_projected * 0.5 * self.Cd * self.rho * self.velocity_field(z_dash, r_dash)**2
+            f_cell = np.array([0,0,-f_cell])
             Force_total += f_cell
 
-            # Calculate torque as the cross product
-            torque = np.cross(torque_arm, [0,0, -f_cell])
+            # calculate torque resulting from cell as the cross product of f_cell and torque arm
+            torque = np.cross(torque_arm, f_cell)
             Torque_total += np.array(torque)
 
             if plot:
                 #ax.quiver(x_b2, y_b2, z_b2,0, 0, -f_cell*20, color='r')
-                ax.quiver(x, y, z, 0, 0, -f_cell*4, color='r')
+                ax.quiver(x, y, z, 0, 0, f_cell, color='r')
 
-        print("total Drag z-Force on UAV2:",-Force_total)
+        print("total Drag z-Force on UAV2:",Force_total)
         print("total Drag torque on UAV2:", Torque_total)
 
         if plot:
-            # add uav 1 z-axis
+            
             ax.quiver(u2_x, u2_y, u2_z, 0, 0, -0.2, color='orange', label="UAV 2")
-
             ax.quiver(u1_x, u1_y, u1_z, 0, 0, -0.2, color='b', label="UAV 1")
-
-            # Setting plot limits and labels
+            # set plot limits and labels
             ax.set_xlim([-0.5, 0.5])
             ax.set_ylim([-2.5, -1.5])
             ax.set_zlim([2, 3])
@@ -160,7 +144,7 @@ class EmpiricalPredictor():
             plt.show()
 
 
-        return np.array([0.0,0.0,-1.0]) * Force_total, Torque_total
+        return Force_total, Torque_total
     
     def T_drag(self, uav_1_state, uav_2_state):
         torque_total = np.array([0.0,0.0,0.0])
@@ -173,8 +157,8 @@ class EmpiricalPredictor():
 
         # for testing, put position of uav 1 above uav2  -----
         u1_x, u1_y, u1_z = uav_2_state[0:3]
-        u1_y += 0.5
-        #u1_x -= 0.25
+        #u1_y += 0.5
+        u1_x += 0.25
         u1_z += 0.5
         # ---
 
@@ -197,7 +181,7 @@ class EmpiricalPredictor():
         A_cell_xy_projected = self.A_cell_horizontal * cosine_angle
 
 
-        print("New proj. Acell:", A_cell_xy_projected * len(self.grid_points))
+        #print("New proj. Acell:", A_cell_xy_projected * len(self.grid_points))
         
         
         # Plotting setup
@@ -345,8 +329,8 @@ class EmpiricalPredictor():
 
     def propeller_thrust_change(self, prop_speed, oncoming_vel):
         
-        #bv is thrust_delay_coefficient
-        bv = 3.7 * 10e-7
+        
+        bv = 3.7 * 10e-7 # thrust_delay_coefficient
         return -bv * prop_speed * oncoming_vel**2
     
     def propeller_thrust_change_torque(self):
@@ -362,65 +346,29 @@ class EmpiricalPredictor():
         return F_drag_total, T_drag_total
 
 
-    def evaluate(self, rel_state_vectors):
+    def evaluate(self, uav_1_states, uav_2_states):
         """
         From R:6 (rel_pos, rel_vel) to R:3 (0, 0, dw_z) 
         """
-        with torch.no_grad():
-            inputs = torch.tensor(rel_state_vectors).to(torch.float32)
-            dw_forces = self.forward(inputs).detach().cpu().numpy()
-            
-            padding = np.zeros((len(dw_forces), 3))
-            padding[:,2] = dw_forces.squeeze()
-            return padding
+        predicted_forces = []
+        ep = EmpiricalPredictor()
+
+        for states in zip(uav_1_states, uav_2_states):
+            predicted_forces.append(ep(states[0], states[1]))
 
 
-exp_path = r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\data\two-P600-both-moving-100Hz\2024-10-08-15-38-29-Dataset-NDP-2-P600-flush-frank-720.0sec-72001-ts.p"
-exp = load_forces_from_dataset(exp_path)
-uav_1, uav_2 = exp['uav_list']
-
-ep = EmpiricalPredictor()
-
-state = 653
-#state = 20
-
-ep(uav_1.states[state], uav_2.states[state])
+        return predicted_forces
 
 
-exit(0)
+# exp_path = r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\data\two-P600-both-moving-100Hz\2024-10-08-15-38-29-Dataset-NDP-2-P600-flush-frank-720.0sec-72001-ts.p"
+# exp = load_forces_from_dataset(exp_path)
+# uav_1, uav_2 = exp['uav_list']
 
-#state = uav_2.states[15000]
-# Plotting
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-for state in uav_1.states[0:2000:5]:
-    x,y,z = state[0:3]
-    yaw, pitch, roll = state[9:12]
+# ep = EmpiricalPredictor()
 
-    #print(yaw,pitch, roll)
+# state = 653
+# #state = 20
 
-    original_vector = [0,0,0.1]
-
-    #bRw = R.from_euler('xyz', [roll, pitch, yaw], degrees=False)
-    #rotated_vector = bRw.apply(original_vector)
-    rotated_vector = original_vector
-    #ax.quiver(0, 0, 0, original_vector[0], original_vector[1], original_vector[2], color='b', label='Original Vector')
-    ax.quiver(x, y, z, rotated_vector[0], rotated_vector[1], rotated_vector[2], color='r', label='Rotated Vector')
+# ep(uav_1.states[state], uav_2.states[state])
 
 
-
-# Setting plot limits and labels
-ax.set_xlim([-0.5, 0.5])
-ax.set_ylim([-2.5, -1.5])
-ax.set_zlim([2, 3])
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Z')
-#ax.legend()
-plt.show()
-
-exit(0)
-
-ep = EmpiricalPredictor()
-
-print(ep([0,0,0], [0,0,1]))

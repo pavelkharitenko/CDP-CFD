@@ -44,7 +44,7 @@
       initial_velocity:
         - 0.0
         - 0.0
-        - 0.0
+        - -8.0
       kinematic_shear_viscosity: 1.8e-5
       
 

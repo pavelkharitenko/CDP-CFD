@@ -14,7 +14,7 @@ def main(controller):
     spin_up_time = 3.0
     measurement_duration = 10.0 # sim seconds
     rotor_ds = 1.0
-    rotor_measurements = np.round(np.arange(401, 430 + rotor_ds, rotor_ds), 1)
+    rotor_measurements = np.round(np.arange(401, 401 + rotor_ds, rotor_ds), 1)
     #throttle_measurements = [0.5]
 
     # connect to simulators controller
@@ -109,6 +109,7 @@ def main(controller):
         rotor_2_rps_list.append(current_r2_measurements)
         rotor_3_rps_list.append(current_r3_measurements)
         rotor_4_rps_list.append(current_r4_measurements)
+        print("predicted avg:", rps_to_thrust_p005_mrv80(np.mean(current_r1_measurements)) - 29.7733538)
 
 
         
@@ -181,7 +182,7 @@ def main(controller):
 
     plt.scatter(rotor_measurements, force_averages)
     plt.show()
-    np.savez("rotor_thrust_map_005_80_rps361_400_430.npz", rotor_measurements=rotor_measurements, force_averages=force_averages)
+    #np.savez("rotor_thrust_map_005_80_rps361_400_430.npz", rotor_measurements=rotor_measurements, force_averages=force_averages)
     
 
 

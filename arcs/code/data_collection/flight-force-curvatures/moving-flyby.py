@@ -1,20 +1,29 @@
+# run 2 quadcopter in a flyby scenario and compare all baseline models on the recorded trajectory
+
 from simcontrol import simcontrol2
 import numpy as np
 import matplotlib.pyplot as plt
 import sys, os
+
 sys.path.append('../../observers/')
 sys.path.append('../../uav/')
 sys.path.append('../../utils/')
 
-#from SO2.model import ShallowEquivariantPredictor
-##from ndp.model import DWPredictor
-#from neuralswarm.model import NeuralSwarmPredictor
+from SO2.model import ShallowEquivariantPredictor
+from ndp.model import DWPredictor
+from neuralswarm.model import NeuralSwarmPredictor
+from empirical.discretization import discretize_shapes
+from empirical.model import EmpiricalPredictor
+#from analytical.model import AnalyticalPredictor
+
 
 from uav import *
 from utils import *
 
+
+exit(0)
 port = 25556
-SIM_DURATION = 5.0
+SIM_DURATION = 1.0
 DRONE_TOTAL_MASS = 3.035 # P600 weight
 HOVER_TIME = 1.2
 FLY_CIRCULAR = False
@@ -42,6 +51,7 @@ uav_2 = UAV("sufferer", controller, "controller2", "imu2", uav_2_ext_z_force_sen
 nan = float('NaN')
 
 # Start simulation
+controller.clear()
 controller.start()
 time_step = controller.get_time_step()  # time_step = 0.0001
 sim_max_duration = SIM_DURATION # sim seconds
@@ -119,7 +129,7 @@ print("Control experiment ended.")
 
 print("Collected ", len(rel_state_vector_list), "samples of data.")
 
-exit(0)
+
 
 # Plot recorded and predicted forces
 
@@ -157,7 +167,7 @@ model.load_state_dict(torch.load(model_paths[2], weights_only=True))
 models.append(model)
 
 predictions = evaluate_zy_force_curvature(models, np.array(rel_state_vector_list))
-labels = ["NDP with SN<4", "SO2-Equiv.", "Nrl.Swarm 2 UAV"]
+labels = ["NDP with SN<4", "SO2-Equiv.", "Nrl.Swarm 2 UAV", "Emprical", "Analytical"]
 
 
 
