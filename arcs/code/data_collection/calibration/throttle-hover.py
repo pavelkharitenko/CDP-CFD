@@ -1,3 +1,4 @@
+# testing noise filtering techniques, single uav taking off and hovering
 from simcontrol import simcontrol2
 import numpy as np
 import matplotlib.pyplot as plt

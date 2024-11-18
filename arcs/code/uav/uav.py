@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 
 class UAV():
-    def __init__(self,uav_name, controller, controller_name, imu_name, external_force_sensors_names, joint_force_torque_sensor_names, mounted_jft_sensor=None):
+    def __init__(self, uav_name, controller, controller_name, imu_name, external_force_sensors_names, joint_force_torque_sensor_names, rotor_joint_sensor_names):
         # init properties
         self.total_mass = 3.3035
         self.name = uav_name
@@ -13,12 +13,12 @@ class UAV():
         self.imu_name = imu_name
         self.jft_sensor_names = joint_force_torque_sensor_names
         self.ef_sensor_names = external_force_sensors_names
-        self.states = [] # contains Px, Py, Pz, Vx,Vy,Vz, Ax,Ay,Az, Yaw,Pitch,Roll, qw,qx,qy,qz  --> should also contain input u or force or each rotor in future
+        self.rotor_sensor_names = rotor_joint_sensor_names
+        self.states = [] # contains Px, Py, Pz, Vx,Vy,Vz, Ax,Ay,Az, Yaw,Pitch,Roll, qw,qx,qy,qz, r1_rps, r2_rps, r3_rps, r4_rps,  --> should also contain input u or force or each rotor in future
         self.jft_forces_list = []
         self.ext_forces_list = []
+        self.rotor_rps_list = []
         self.timestamp_list = []
-        self.mounted_jft_sensor = mounted_jft_sensor
-        self.mounted_jft_sensor_list = []
         # init sensors
         self.init_sensors()
 
@@ -28,13 +28,15 @@ class UAV():
         self.imu_idx = self.get_sensor_idx(self.imu_name)
         self.ef_sensor_idxs = self.get_sensor_idx(self.ef_sensor_names)
         self.jtf_sensor_idxs = self.get_sensor_idx(self.jft_sensor_names)
-        if self.mounted_jft_sensor:
-            self.mounted_jft_sensor_idx = self.get_sensor_idx(self.mounted_jft_sensor)
+        self.rotor_sensor_idxs = self.get_sensor_idx(self.rotor_sensor_names)
+        
         
     def update(self, reply, timestep):
         self.reply = reply
         # read xyz pos, xyz vel, xyz acc, yaw-pitch-roll, rot. quaternions w, x, y, z 
-        self.states.append(self.read_sensor(reply, self.imu_idx, [0,1,2, 6,7,8, 12,13,14, 3,4,5, 18,19,20,21]))
+        state = self.read_sensor(reply, self.imu_idx, [0,1,2, 6,7,8, 12,13,14, 3,4,5, 18,19,20,21])
+        
+        
         # update external force sensors of body and 5 rotors
         ext_forces_body_r1234 = self.read_multiple_sensors(reply, self.ef_sensor_idxs)
         self.ext_forces_list.append(ext_forces_body_r1234)
@@ -43,10 +45,16 @@ class UAV():
         body_r1_r2_r3_r4_jft = self.read_multiple_sensors(reply, self.jtf_sensor_idxs, [2])
         self.jft_forces_list.append(body_r1_r2_r3_r4_jft)
 
-        # update mounted jft sensor if available
-        if self.mounted_jft_sensor:
-            self.mounted_jft_sensor_list.append(self.read_sensor(reply, self.mounted_jft_sensor_idx, [0,1,2,3,4,5]))
-            #print("### ### stored mtd sensor:", self.mounted_jft_sensor_list[-1][2])
+        # update rotor joint rps lists:
+        r1_r2_r3_r4_rps = self.read_multiple_sensors(reply, self.rotor_sensor_idxs)
+        #print("Recorded rotor rps:", r1_r2_r3_r4_rps)
+        self.rotor_rps_list.append(r1_r2_r3_r4_rps)
+        state.extend(r1_r2_r3_r4_rps)
+
+        self.states.append(state)
+
+        #print("new state:", len(self.states[-1]) , self.states[-1])
+        
         # update current time
         self.timestamp_list.append(timestep)
 

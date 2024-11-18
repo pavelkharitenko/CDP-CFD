@@ -12,24 +12,23 @@ sys.path.append('../../utils/')
 from SO2.model import ShallowEquivariantPredictor
 from ndp.model import DWPredictor
 from neuralswarm.model import NeuralSwarmPredictor
-from empirical.discretization import discretize_shapes
 from empirical.model import EmpiricalPredictor
-#from analytical.model import AnalyticalPredictor
+from analytical.model import AnalyticalPredictor
 
 
 from uav import *
 from utils import *
 
 
-exit(0)
 port = 25556
-SIM_DURATION = 1.0
+SIM_DURATION = 4.0
 DRONE_TOTAL_MASS = 3.035 # P600 weight
 HOVER_TIME = 1.2
 FLY_CIRCULAR = False
 freq = 0.02
 radius = 3.0
-y_velocity = 0.75
+y_velocity = 0.8
+z_distance = 0.8
 
 # connect to simulators controller
 controller = simcontrol2.Controller("localhost", port)
@@ -84,14 +83,14 @@ while curr_sim_time < sim_max_duration:
     
     if curr_sim_time < HOVER_TIME:
         #px4_input_1 = (0.0, nan,nan,nan, 0.0, 0.0, 0.0, nan, nan, nan, 0.0, nan) 
-        px4_input_1 = (0.0, 0.0, -1, 0.6, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+        px4_input_2 = (0.0, 0.0, -1.5, -1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
     else:
         # keep set all acc to 0
-        px4_input_1 = (0.0, nan, nan, 0.6, nan, y_velocity, nan, 0.0, 0.0, 0.0, 0.0, nan) 
+        px4_input_2 = (0.0, 0.0, 1.0, -1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
         #px4_input_1 = (0.0, nan,nan,nan, 0.0, 0.0, 0.0, nan, nan, nan, 0.0, nan) 
             
     # second drone just hovering
-    px4_input_2 = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, 0.0, nan)
+    px4_input_1 = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, 0.0, nan)
 
     # Simulate a control period, giving actuator input and retrieving sensor output
     reply = controller.simulate(steps_per_call,  {
@@ -131,6 +130,8 @@ print("Collected ", len(rel_state_vector_list), "samples of data.")
 
 
 
+
+
 # Plot recorded and predicted forces
 
 Fz_total = [uav_2.total_mass * state[8] for state in uav_2.states] # recorded actual uav m*a z-Force
@@ -144,7 +145,17 @@ dw_forces += g_bias_steady_state
 #print("dw forces after subtracting bias:", dw_forces[-500:-400])
 
 dw_force_vectors = np.array([(0,0,dw_force) for dw_force in dw_forces])
-plt.plot(time_seq,[meas[2] for meas in dw_force_vectors], label='Recorded z-force')
+measured_forces = [meas[2] for meas in dw_force_vectors]
+
+np.savez("flyby_below_80_005_rel_state_vector.npz", time_seq=time_seq, measured_forces=measured_forces, rel_state_vector_list=rel_state_vector_list)
+
+start_idx = 2000
+time_seq = time_seq[start_idx:]
+rel_state_vector_list = rel_state_vector_list[start_idx:]
+measured_forces = measured_forces[start_idx:]
+
+
+plt.plot(time_seq, measured_forces, label='Actual z-force')
 
 model_paths = [
     r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\trained_models\100Hz-data-both-drones-summed-dataset\2024-10-09-21-24-10-NDP-Li-Model-sn_scale-4-144k-datapoints-corrected-bias-sizzling-speed20000_eps.pth",
@@ -166,8 +177,17 @@ model = NeuralSwarmPredictor()
 model.load_state_dict(torch.load(model_paths[2], weights_only=True))
 models.append(model)
 
+model = EmpiricalPredictor()
+models.append(model)
+model = AnalyticalPredictor()
+models.append(model)
+
+
 predictions = evaluate_zy_force_curvature(models, np.array(rel_state_vector_list))
 labels = ["NDP with SN<4", "SO2-Equiv.", "Nrl.Swarm 2 UAV", "Emprical", "Analytical"]
+
+
+
 
 
 

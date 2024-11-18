@@ -6,7 +6,6 @@
 #----------------------------------
 import sys
 import numpy as np
-from discretization import discretize_shapes
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 sys.path.append('../../utils/')
@@ -20,7 +19,7 @@ class AnalyticalPredictor():
         # empirical parameters
         self.Bd = 10.11
         self.S = 0.07668
-        self.s0 = -5.817
+        self.s0 = 0.2#-5.817
 
         self.Cd = 1.18 # aerodynamic property of uav (like flat plane)
         self.Ap = np.pi * 0.195**2 # propeller disk area A = pi * r^2
@@ -41,7 +40,8 @@ class AnalyticalPredictor():
         arm_lr_vertices = -arm_ul_vertices
         
         self.grid_points, self.x_cell_length, self.y_cell_length = discretize_shapes([
-            body_frame_vertices, arm_ur_vertices, arm_ll_vertices, arm_ul_vertices, arm_lr_vertices])
+            body_frame_vertices, arm_ur_vertices, arm_ll_vertices, arm_ul_vertices, arm_lr_vertices],
+            n_cells=12.0,)
         #plt.scatter(self.grid_points[:, 0], self.grid_points[:,1], color="red", s=5)
         #plt.show()
 
@@ -66,19 +66,27 @@ class AnalyticalPredictor():
         # normalize
         s = s / self.l
         r = r / self.l
+        #print("r normalized:", r)
         # compute centerline velocity and jet half width spread as
         U_c = self.Bd /(s - self.s0)
         r_half = self.S * (s - self.s0)
+        #print("r_half", r_half)
         r_half = r_half / self.l
+        #print("r half normalized", r_half)
 
         r_tilde = r / r_half
 
+        #print("r_tilde", r_tilde)
+
         # scale Uc
         U_c = U_c * self.U_hover
+        #print("U hover", self.U_hover)
 
         # compute velocity field:
-        U_c / (1.0 + (np.sqrt(2.0) - 1.0)* r_tilde**2)**2
+        #print("denominator", (1.0 + (np.sqrt(2.0) - 1.0)* r_tilde**2)**2)
+        U_c = U_c / (1.0 + (np.sqrt(2.0) - 1.0)* r_tilde**2)**2
 
+        #print("U_c", U_c)
         return U_c
 
 
@@ -129,11 +137,13 @@ class AnalyticalPredictor():
 
             # horizontal separation of grid point from uav 1
             r_dash = np.sqrt((u1_x - x)**2 + (u1_y - y)**2)
+            #print(r_dash)
             # vertical separation from uav 1
             z_dash = u1_z - u2_z
 
             # compute force f acting on one gridpoint by integrating velocity field at this cell
             f_cell = A_cell_xy_projected * 0.5 * self.Cd * self.rho * self.U_flow(z_dash, r_dash)**2
+            
             f_cell = np.array([0,0,-f_cell])
             Force_total += f_cell
 
@@ -178,21 +188,30 @@ class AnalyticalPredictor():
         return F_drag_total, T_drag_total
 
 
-    def evaluate(self, uav_1_states, uav_2_states):
+    def evaluate(self, rel_states):
         """
         From R:6 (rel_pos, rel_vel) to R:3 (0, 0, dw_z) 
+        Only evaluates F_drag, T_drag unused but possible to account
         """
         predicted_forces = []
-        ap = AnalyticalPredictor()
-
-        for states in zip(uav_1_states, uav_2_states):
-            predicted_forces.append(ap(states[0], states[1]))
-
-
-        return predicted_forces
-
         
 
+        for u1_state in rel_states:
+            u2_state = np.zeros(12)
+            u1_state = np.pad(u1_state, (0, 12 - len(u1_state)), mode='constant', constant_values=0)
+            #print(u1_state)
+            #print(u2_state)
+
+            predicted_forces.append(self.F_drag(u1_state, u2_state)[0])
+
+
+        return np.array(predicted_forces)
+
+#ap = AnalyticalPredictor()
+#rel_state = [[0.0, 0.0, 0.5, 0, 0, 0]]
+#print(ap.evaluate(rel_state))
+
+#plot_zy_xy_slices_empirical(ap)
 
 # exp_path = r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\data\two-P600-both-moving-100Hz\2024-10-08-15-38-29-Dataset-NDP-2-P600-flush-frank-720.0sec-72001-ts.p"
 # exp = load_forces_from_dataset(exp_path)

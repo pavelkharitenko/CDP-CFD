@@ -3,12 +3,14 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random as rnd
-#sys.path.append('../uav/')
+from shapely.geometry import Polygon, Point
 sys.path.append('../../uav/')
 from uav import *
 sys.path.append("../observers/ndp/")
 sys.path.append("../observers/SO2/")
+sys.path.append(".../observers/empirical")
 #from model import *
+from scipy.signal import savgol_filter
 
 
 
@@ -503,6 +505,87 @@ def plot_zy_yx_slices_ns(model):
     plt.show()
 
 
+def plot_zy_xy_slices_empirical(model):
+    # Plot xy-slices at different Z-values:
+    xy_plane_z_samples = [-1.0, -0.5, 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25 ]
+    xy_range = 1.0 # size of XY plane
+    plane_res = 40 # number of points sampled for plotting in one dimension
+
+    color="autumn"
+    test_f = []
+    fig, ax = plt.subplots(2, len(xy_plane_z_samples), sharex=True, sharey=True)
+
+    
+    
+    
+    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
+
+    all_imgs = [] # save all
+
+    # loop over Z-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 9])
+        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                dx = [xy_samples[i], xy_samples[j], z_point]
+
+                u2_state = np.zeros(12)
+                u1_state = np.pad(dx, (0, 12 - len(dx)), mode='constant', constant_values=0)
+                pred_dw = model.F_drag(u1_state, u2_state)[0]
+                plot_f[i, j] = pred_dw[2]
+                plotted_forces.append(pred_dw[2])
+               
+
+        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[0][idx].set_title(f"Z = {z_point}m")
+        
+    
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    # plot xz-slice
+
+    # loop over Y-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 9])
+        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                dx = [xy_samples[i], z_point, xy_samples[j]]
+                
+                u2_state = np.zeros(12)
+                u1_state = np.pad(dx, (0, 12 - len(dx)), mode='constant', constant_values=0)
+                pred_dw = model.F_drag(u1_state, u2_state)[0]
+                plot_f[i, j] = pred_dw[2]
+                plotted_forces.append(pred_dw[2])
+               
+
+        im = ax[1][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[1][idx].set_title(f"Y = {z_point}m")
+
+    # add the bar and fix min-max colormap
+    for im in all_imgs:
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    plt.xlabel('Forces in Newton (N)')
+    
+    plt.show()
+
 def plot_z_slices_ns(model):
     # Plot xy-slices at different Z-values:
     xy_plane_z_samples = [-1.5, -1.0, -0.75, -0.5, 0.0, 0.5, 1.0, 1.25, 1.5]
@@ -882,10 +965,10 @@ def save_experiment(exp_name, uav_list, success, sim_duration, bias=None):
     exp_name += "-" + str(sim_duration) + "sec-" + str(len(uav_list[0].timestamp_list)) + "-ts"
     
     if not success:
-        print("#### --- during simulation, an error occured, not saving results of experiment", exp_name)
+        #print("#### --- during simulation, an error occured, not saving results of experiment", exp_name)
         exit(1)
     else:
-        print("#### Saving experiment", exp_name, "...")
+        #print("#### Saving experiment", exp_name, "...")
        
         exp_obj = {'exp_name': exp_name, 'uav_list': uav_list, 'bias': bias}
         
@@ -896,8 +979,8 @@ def save_experiment(exp_name, uav_list, success, sim_duration, bias=None):
             pickle.dump(exp_obj, handle)
         
 
-        print("#### Saved.")
-        print("################################")
+        #print("#### Saved.")
+        #print("################################")
         return save_name
 
       
@@ -1135,6 +1218,157 @@ def rps_to_thrust_p005_mrv80(mean_rps):
     return a*mean_rps**2 + b* mean_rps + c
 
 
-# thrust = c1 * w**2 => c1 = thrust / w**2
-#w = 375
-#print(rps_to_thrust_p005_mrv80(w)/(4*w**2))
+def discretize_shapes(vertices_list, n_cells=18.0, plot=False):
+    """
+    Creates 2d frame from vertices, disretizes as grid with cells and plots optionally
+    """
+
+    total_grid_points = []
+
+    if plot:
+        
+        plt.figure(figsize=(8, 8))
+
+    for vertices in vertices_list:
+        frame_shape = Polygon(vertices)
+
+        # Set the grid size (5 cm = 0.05 meters)
+
+        # Define the bounding box for the grid based on the diamond shape
+        min_x, min_y, max_x, max_y = frame_shape.bounds
+
+        x_cell_size = (max_x - min_x) / n_cells
+        y_cell_size = (max_y - min_y) / n_cells
+
+
+        # Generate the grid points within the bounding box
+        x_coords = np.arange(min_x, max_x , x_cell_size)
+        y_coords = np.arange(min_y, max_y, y_cell_size)
+        
+        X, Y = np.meshgrid(x_coords, y_coords)
+        grid_points = np.vstack([X.ravel(), Y.ravel()]).T
+
+        # Check which points are inside the diamond shape
+        inside_points = [point for point in grid_points if frame_shape.contains(Point(point))]
+
+        # Convert the inside points to an array for plotting
+        inside_points = np.array(inside_points)
+        
+        
+        total_grid_points.extend(inside_points)
+
+        # Plot the diamond shape and the discretized points
+        if plot:
+            #plt.figure(figsize=(8, 8))
+            plt.plot(*zip(*vertices, vertices[0]), color='black', linewidth=2)
+            plt.scatter(inside_points[:, 0], inside_points[:, 1], color='blue', s=4)
+    
+    total_grid_points = np.array(total_grid_points)
+
+    if plot:
+        plt.xlabel("X (meters)")
+        plt.ylabel("Y (meters)")
+        plt.legend()
+        plt.title(f"Discretized Frame for {x_cell_size}m grid cell length")
+        plt.axis("equal")
+        plt.grid(True)
+        #plt.scatter(total_grid_points[:,0], total_grid_points[:,1], color="red", s=5)
+        plt.show()
+    
+    A_cell = x_cell_size*y_cell_size
+    return total_grid_points, x_cell_size, y_cell_size
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+def sample_3d_point(y_pos):
+    """
+    Samples a 3D point from the specified Gaussian distributions with clamping.
+    Returns:
+        (x, y, z): A tuple of sampled 3D coordinates.
+    """
+    y_pos = np.round(y_pos,1)
+    # Y-coordinate: Two peaks at -0.7 and 0.7, clamped between [-1.0, -0.4] and [0.4, 1.0]
+    if y_pos > 0.0:  # Choose one of the two peaks
+        y = np.random.normal(loc=-0.9, scale=0.15)
+        y = np.clip(y, -1.2, -0.6)
+    else:
+        y = np.random.normal(loc=0.9, scale=0.15)
+        y = np.clip(y, 0.6, 1.2)
+
+    # Z-coordinate: Gaussian centered at 0.75, clamped between [0.25, 0.75]
+    z = np.random.normal(loc=1.75, scale=0.15)
+    z = np.clip(z, 0.5, 2.50)
+
+    # X-coordinate: Gaussian centered at 0, clamped between [-0.3, 0.3]
+    x = np.random.normal(loc=0, scale=0.15)
+    x = np.clip(x, -0.4, 0.4)
+
+    return x, y, z
+
+def plot_distribution(num_samples=1000):
+    """
+    Generates and plots the 3D distribution of sampled points.
+    Args:
+        num_samples: Number of points to sample for visualization.
+    """
+    points = np.array([sample_3d_point(1.0) for _ in range(num_samples)])
+    x, y, z = points[:, 0], points[:, 1], points[:, 2]
+
+    # Create 3D scatter plot
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    scatter = ax.scatter(x, y, z, c=z, cmap='viridis', s=5, alpha=0.7)
+
+    # Labeling and aesthetics
+    ax.set_title("3D Gaussian Distribution Sampling", fontsize=14)
+    ax.set_xlabel("X-axis")
+    ax.set_ylabel("Y-axis")
+    ax.set_zlabel("Z-axis")
+    fig.colorbar(scatter, label="Z-coordinate", shrink=0.6)
+
+    plt.show()
+
+
+
+def smooth_with_savgol(data, window_size=5, poly_order=2):
+    """
+    Smooths the input data using the Savitzky-Golay filter while keeping the number of output points unchanged.
+    
+    Args:
+        data: List or array of measurements to be smoothed.
+        window_size: Size of the sliding window (must be odd and >= poly_order + 2).
+        poly_order: Order of the polynomial used for fitting.
+        
+    Returns:
+        Smoothed data with the same length as the input.
+    """
+    # Ensure window_size is odd and valid
+    if window_size % 2 == 0:
+        raise ValueError("window_size must be an odd number.")
+    if window_size < poly_order + 2:
+        raise ValueError("window_size is too small for the given poly_order.")
+
+    # Apply Savitzky-Golay filter
+    smoothed_data = savgol_filter(data, window_length=window_size, polyorder=poly_order)
+    return smoothed_data
+
+def moving_average(data, window_size):
+    return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
+
+
+
+
+
+
+
+
+
+# Sample a single point
+#sample = sample_3d_point(-1.0)
+#print("Sampled Point:", sample)
+
+# Plot the distribution
+#plot_distribution(num_samples=5000)
