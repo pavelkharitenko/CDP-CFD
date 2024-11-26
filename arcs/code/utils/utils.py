@@ -6,12 +6,16 @@ from numpy import random as rnd
 from shapely.geometry import Polygon, Point
 sys.path.append('../../uav/')
 from uav import *
-sys.path.append("../observers/ndp/")
-sys.path.append("../observers/SO2/")
-sys.path.append(".../observers/empirical")
-#from model import *
-from scipy.signal import savgol_filter
 
+
+
+from scipy.signal import savgol_filter
+from scipy.spatial.transform import Rotation as R
+
+sys.path.append('../../../observers/')
+
+from ndp.model import DWPredictor
+from SO2.model import ShallowEquivariantPredictor
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -1208,15 +1212,36 @@ def euler_angles_to_quaternion(roll, pitch, yaw):
 
 
 def rps_to_thrust_p005_mrv80(mean_rps):
-    """Function to calculate thrust for given avg. rps, accurate for 340-430rps"""
+    """
+    Function to calculate thrust for given avg. rps, accurate for 340-430rps.
+    Constants derived from range of measurements
+    """
     a = 0.00019339212
     b = 0.01897496901
     c = -4.52623347271
 
-    # for single rotor: thrust = c * w**2 => c = 5.29513e-05
+    #Ct =  0.000362
+    #rho = 1.225
+    #A = 0.11948
+    #k = Ct * rho * A
+    #d = 0.3
+    #F = k * one_rotor_rps**2
     
     return a*mean_rps**2 + b* mean_rps + c
 
+
+def omega_to_thrust_p005_mrv80(mean_rps):
+    """
+    Computes force by F = c * omega^2, accurate for any range
+    Constants derived experimentally.
+    """
+    Ct =  0.000362
+    rho = 1.225
+    A = 0.11948
+    k = Ct * rho * A
+    d = 0.3
+
+    return 4.0*k * mean_rps**2.0
 
 def discretize_shapes(vertices_list, n_cells=18.0, plot=False):
     """
@@ -1292,15 +1317,15 @@ def sample_3d_point(y_pos):
     y_pos = np.round(y_pos,1)
     # Y-coordinate: Two peaks at -0.7 and 0.7, clamped between [-1.0, -0.4] and [0.4, 1.0]
     if y_pos > 0.0:  # Choose one of the two peaks
-        y = np.random.normal(loc=-0.9, scale=0.15)
-        y = np.clip(y, -1.2, -0.6)
+        y = np.random.normal(loc=-1.5, scale=0.15)
+        y = np.clip(y, -1.7, -0.7)
     else:
-        y = np.random.normal(loc=0.9, scale=0.15)
-        y = np.clip(y, 0.6, 1.2)
+        y = np.random.normal(loc=1.5, scale=0.15)
+        y = np.clip(y, 0.7, 1.7)
 
-    # Z-coordinate: Gaussian centered at 0.75, clamped between [0.25, 0.75]
-    z = np.random.normal(loc=1.75, scale=0.15)
-    z = np.clip(z, 0.5, 2.50)
+    # Z-coordinate: Gaussian centered at 0.75, clamped between [0.0, 1.5]
+    z = np.random.normal(loc=0.75, scale=0.25)
+    z = np.clip(z, 0.0, 1.5)
 
     # X-coordinate: Gaussian centered at 0, clamped between [-0.3, 0.3]
     x = np.random.normal(loc=0, scale=0.15)
@@ -1308,7 +1333,7 @@ def sample_3d_point(y_pos):
 
     return x, y, z
 
-def plot_distribution(num_samples=1000):
+def plot_distribution(num_samples=100):
     """
     Generates and plots the 3D distribution of sampled points.
     Args:
@@ -1358,17 +1383,224 @@ def smooth_with_savgol(data, window_size=5, poly_order=2):
 def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
 
+def sample_from_range(lower,upper):
+    random_numbers = np.random.uniform(lower, upper, size=1)
+
+    return random_numbers[0]
+
+
+def extract_and_plot_data(data_set_paths=None, 
+                          predictors=[], 
+                          time_seq=None, uav_1_states=None, uav_2_states=None, 
+                          plot=False, roll_iterations=True, save=False):
+    """
+    After collecting agile flight data, plot, evaluate and save uav states as dataset.
+    """
+    if data_set_paths:
+        uav_1_states = []
+        uav_2_states = []
+        time_seq = []
+
+        for path in dataset_paths:
+            exp = load_forces_from_dataset(path)
+            uav_1, uav_2 = exp['uav_list']
+            uav_1_states.extend(uav_1.states[0:])
+            uav_2_states.extend(uav_2.states[0:])
+            time_seq.extend(uav_1_states.timestamp_list)
+    
+    else: 
+        uav_1_states = uav_1_states
+        uav_2_states = uav_2_states
+        time_seq = time_seq
+
+    plot = True
+    mass = 3.035
+    g = -9.85
+    
+
+    # 1 extract necessary parameters from uav states
+    rel_state_vector_list = np.array(uav_1_states) - np.array(uav_2_states)
+    u2_rotations = [R.from_euler('xyz', [yaw_pitch_roll[2], yaw_pitch_roll[1], yaw_pitch_roll[0]], degrees=False) for yaw_pitch_roll in np.array(uav_2_states)[:,9:12]]
+    u2_avg_rps = np.mean(np.abs(np.array(uav_2_states)[:,19:23]), axis=1)
+    u2_rps_rot = zip(u2_avg_rps, u2_rotations)
+
+    
+    overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 0.6)[0]
+    overlaps = np.array(time_seq)[overlap_indices]
+
+    # 2 compute uav actual forces, smooth them, and compute controller z-axis forces, and their residual disturbance
+    u2_accelerations = np.array(uav_2_states)[:,8]
+    u2_z_forces = u2_accelerations * mass
+    smoothed_u2_z_forces = smooth_with_savgol(u2_z_forces, window_size=61, poly_order=1)
+    u2_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[2] + (g*mass) for (avg_rps, u2_rotations) in u2_rps_rot]
+    u2_z_dw_forces = smoothed_u2_z_forces - u2_thrusts
+
+    
+    model_paths = [
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-11-20-13-11-05-NDP-predictor-sn_scale-4-300k-ts-flyby-navy-sill20000_eps.pth",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\SO2\2024-11-20-00-10-30-SO2-Model-below-sn_scale-None-gray-javelin20000_eps.pth",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\SO2\2024-11-20-12-30-17-SO2-Model-below-sn_scale-4-dull-flow20000_eps.pth",
+    ]
+    models = []
+
+    colors= ["green", "yellow", "red"]
+
+    model = DWPredictor()
+    model.load_state_dict(torch.load(model_paths[0], weights_only=True))
+    models.append(model)
+
+    model = ShallowEquivariantPredictor()
+    model.load_state_dict(torch.load(model_paths[1], weights_only=True))
+    models.append(model)
+
+    model = ShallowEquivariantPredictor()
+    model.load_state_dict(torch.load(model_paths[2], weights_only=True))
+    models.append(model)
+
+
+    predictions = evaluate_zy_force_curvature(models, np.array(rel_state_vector_list)[:,:6])
+    labels = [ 
+        "NDP new data SN<4 ", 
+        "SO2-Equiv.", 
+        "SO2-Equiv. SN<4", 
+    ]
+
+
+
+    # 3 plot if needed
+    if plot:
+        fig = plt.subplot()
+        #fig.plot(u2_z_forces, label="UAV's z-axis forces") # unsmoothed
+        plot_array_with_segments(fig, time_seq, smoothed_u2_z_forces, color="blue", roll=roll_iterations, label="controller z-forces")
+        plot_array_with_segments(fig, time_seq, u2_thrusts,  color="orange", roll=roll_iterations, label="controller z-forces")
+        plot_array_with_segments(fig, time_seq, u2_z_dw_forces, color="magenta", roll=roll_iterations, label="downwash disturbance forces", overlaps=overlaps)
+        
+        # evaluate predictors
+        for idx, prediction in enumerate(predictions):
+            plot_array_with_segments(fig, time_seq, prediction[:,2], roll=roll_iterations, color=colors[idx], label=labels[idx])
+            compute_rmse(prediction[:,2][overlap_indices], u2_z_dw_forces[overlap_indices],label=labels[idx])
+            
+        
+        
+
+
+
+        plt.ylabel("Force [N]")
+        plt.xlabel("time [s]")
+        plt.grid()
+        plt.title("Actual bottom UAV Z-forces, controller's thrust, and residual downwash force")
+        plt.legend()
+        plt.show()
+
+
+
+    # 4 create label:
+    u2_z_dw_forces = np.array([[0,0,z_force] for z_force in u2_z_dw_forces])
+
+    # label format v1: [state_uav1, state_uav2, dw_forces]
+    if save:
+        np.savez(f"precise_200Hz_80_005_flyby_below_{len(uav_1_states)}ts_labels", uav_1_states=uav_1_states, uav_2_states=uav_2_states, dw_forces=u2_z_dw_forces)
 
 
 
 
+def plot_array_with_segments(fig, time, array, roll=True, color=None, label=None, overlaps=[]):
+    """
+    Plots a single numpy array either fully or segmented where the time array resets to 0.
+    
+    Args:
+        time (np.ndarray): The time array with periodic resets to 0.
+        array (np.ndarray): The numpy array to be plotted against the time array.
+        plot_fully (bool): If True, plots the entire array; if False, plots segments starting at resets.
+    """
+    if len(time) != len(array):
+        raise ValueError("The time array and data array must have the same length.")
+
+    if not roll:
+        
+        #fig.plot(time, array, label=label, color=color)
+        fig.plot(array, label=label, color=color)
+
+        
+            
+        #fig.axvline(overlaps, color='grey', linestyle='--', alpha=0.1)
+
+
+    else:
+
+        # Find the indices where the time array decreases (reset points)
+        reset_indices = np.where(np.diff(time) < 0)[0] + 1  # Add 1 to shift to the start of the next segment
+        reset_indices = np.append([0], reset_indices)  # Include the start of the array as the first segment boundary
+        reset_indices = np.append(reset_indices, len(time))  # Include the end of the array as the last boundary
+        
+        for i in range(len(reset_indices) - 1):
+            start, end = reset_indices[i], reset_indices[i + 1]
+            segment_time = time[start:end]
+            segment_data = array[start:end]
+            fig.plot(segment_time, segment_data, color=color)
+    
+        for line_time in overlaps:
+            if line_time in time:  # Ensure the line time exists in the time array
+                fig.axvline(line_time, color='grey', linestyle='--', alpha=0.1)
 
 
 
+def compute_rmse(array1, array2, label=None):
+    rmse = np.sqrt(np.mean((array1 - array2) ** 2))
+    if label:
+        print(f"RMSE of {label} is: {rmse}")
+    else:
+        print(f"RMSE is", str(rmse))
+    return rmse
 
-# Sample a single point
-#sample = sample_3d_point(-1.0)
-#print("Sampled Point:", sample)
+def plot_uav_angles(time, roll, pitch, yaw):
+    """
+    Plots the roll, pitch, and yaw angles of a UAV over time.
+    
+    Args:
+        time (np.ndarray): Time array.
+        roll (np.ndarray): Roll angle array in degrees or radians.
+        pitch (np.ndarray): Pitch angle array in degrees or radians.
+        yaw (np.ndarray): Yaw angle array in degrees or radians.
+    """
+    if not (len(time) == len(roll) == len(pitch) == len(yaw)):
+        raise ValueError("Time, roll, pitch, and yaw arrays must have the same length.")
+    
+    plt.figure(figsize=(12, 6))
 
-# Plot the distribution
-#plot_distribution(num_samples=5000)
+    # Plot roll
+    plt.plot(time, roll, label="Roll", color="blue", linewidth=1.5)
+    
+    # Plot pitch
+    plt.plot(time, pitch, label="Pitch", color="green", linewidth=1.5)
+    
+    # Plot yaw
+    plt.plot(time, yaw, label="Yaw", color="red", linewidth=1.5)
+
+    # Labels and grid
+    plt.xlabel("Time (s)")
+    plt.ylabel("Angle (degrees or radians)")
+    plt.title("UAV Roll, Pitch, and Yaw Angles Over Time")
+    plt.legend()
+    plt.grid(True)
+    
+    plt.tight_layout()
+    #plt.show()
+
+
+def compute_torques(omega_0, omega_1, omega_2, omega_3):
+    Ct =  1.54*10.0**(-2.0)
+    rho = 1.225
+    A = 0.03
+    k = Ct * rho * A
+    d = 0.3
+
+
+    # roll torque (τ_x)
+    tau_x = k * d * (omega_0**2 + omega_1**2 - omega_2**2 - omega_3**2)
+    # pitch torque (τ_y)
+    tau_y = k * d * (omega_3**2 + omega_1**2 - omega_0**2 - omega_2**2)
+    # yaw torque (τ_z)
+    tau_z = -k * (omega_1**2 - omega_0**2 + omega_3**2 - omega_2**2)
+
+    return tau_x, tau_y, tau_z

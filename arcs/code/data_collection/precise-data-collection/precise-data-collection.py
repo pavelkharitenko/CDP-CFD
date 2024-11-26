@@ -16,8 +16,10 @@ from utils import *
 
 def main(controller):
 
-    SAVE_EXP = True
+    SAVE_EXP = False
     SAVE_INTERVALL = 60.0
+    ITERATION_TIME = 2.5
+    EVALUATION_TIME = 3.0
 
     port = 25557
     SIM_MAX_DURATION = 720.0
@@ -72,12 +74,28 @@ def main(controller):
     time_seq = []
     rel_state_vector_list = []
    
-    next_way_point_uav_1 = [0.0,-1.0,0.7] # uav 1 hover at (0,-1,0.7)
+    next_way_point_uav_1 = [0.0,-1.5,1.5] # uav 1 hover at (0,-1,0.7)
     yaw_uav_1 = 1.570796326794897
 
 
     # each iteration sends control signal
     while curr_sim_time < SIM_MAX_DURATION:
+
+
+        if curr_sim_time >= HOVER_TIME + ITERATION_TIME:
+            ITERATION_TIME += ITERATION_TIME
+            HOVER_TIME += curr_sim_time
+
+            controller.clear()
+            controller.start()
+
+            print("### -----------------------------------------")
+            print("### Sim time:", curr_sim_time, "/", SIM_MAX_DURATION, "s", " ## Sim steps:", curr_step ,"/", total_sim_steps, "steps ###")
+            print("Collected ", len(time_seq), "samples of data.")
+            print("Max. force on uav 2 recorded: ", np.max(np.abs(np.array(uav_2.states)[:,8]*DRONE_TOTAL_MASS)))
+            print("Max. Y-vel. of uav 1 recorded: ", np.max(np.abs(np.array(uav_1.states)[:,4])))
+            print("Min height of uav 1:", np.min(np.array(uav_1.states)[:,2]))
+            print("Min height of uav 2:", np.min(np.array(uav_2.states)[:,2]))
 
         
         time_seq.append(curr_sim_time) # log everything at current timestep  first
@@ -85,7 +103,7 @@ def main(controller):
 
 
         current_time = np.round(curr_sim_time, 3)
-        if current_time >= HOVER_TIME and current_time % 4.000 == 0.0:
+        if current_time >= HOVER_TIME:
             next_way_point_uav_1 = sample_3d_point(uav_1.states[-1][1])
             #print("next point set to", next_way_point_uav_1)
         
@@ -113,7 +131,7 @@ def main(controller):
 
 
         # log state of experiment:
-        if current_time >= HOVER_TIME and current_time % 15.000 == 0.0:
+        if False and current_time % EVALUATION_TIME == 0.0:
             print("### -----------------------------------------")
             print("### Sim time:", curr_sim_time, "/", SIM_MAX_DURATION, "s", " ## Sim steps:", curr_step ,"/", total_sim_steps, "steps ###")
             print("Collected ", len(time_seq), "samples of data.")

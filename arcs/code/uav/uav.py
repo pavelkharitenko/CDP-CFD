@@ -7,6 +7,18 @@ class UAV():
     def __init__(self, uav_name, controller, controller_name, imu_name, external_force_sensors_names, joint_force_torque_sensor_names, rotor_joint_sensor_names):
         # init properties
         self.total_mass = 3.3035
+        self.inertia_matrix = np.array([
+            [0.05487, 0,       0],
+            [0,       0.05487, 0],
+            [0,       0,       0.1027]
+        ])
+        self.inertia_matrix_rotors = intertia_total = np.array([
+            [0.0566739, 0, 0],
+            [0, 0.05776242, 0],
+            [0, 0, 0.10739602]
+        ])
+
+
         self.name = uav_name
         self.controller = controller
         self.controller_name = controller_name
@@ -33,8 +45,13 @@ class UAV():
         
     def update(self, reply, timestep):
         self.reply = reply
-        # read xyz pos, xyz vel, xyz acc, yaw-pitch-roll, rot. quaternions w, x, y, z 
-        state = self.read_sensor(reply, self.imu_idx, [0,1,2, 6,7,8, 12,13,14, 3,4,5, 18,19,20,21])
+        # read xyz pos, xyz vel, xyz acc, yaw-pitch-roll, rot.  and torques:
+        state = self.read_sensor(reply, self.imu_idx, 
+                                 [0,1,2, 6,7,8, 12,13,14, # [0,1,2, 3,4,5, 6,7,8] xyz pos, vel, acc
+                                  3,4,5, # [9,10,11] yaw, pitch, roll
+                                  15,16,17,  # [12,13,14] roll_dot, pitch_dot, yaw_dot
+                                  18,19,20,21]) # [15,16,17,18] quaternions w, x, y, z
+                                # ([19,20,21,22]) rotor velocities (in rad, per second)
         
         
         # update external force sensors of body and 5 rotors
@@ -45,11 +62,42 @@ class UAV():
         body_r1_r2_r3_r4_jft = self.read_multiple_sensors(reply, self.jtf_sensor_idxs, [2])
         self.jft_forces_list.append(body_r1_r2_r3_r4_jft)
 
-        # update rotor joint rps lists:
+        # update rotor joint rps lists if available:
         r1_r2_r3_r4_rps = self.read_multiple_sensors(reply, self.rotor_sensor_idxs)
         #print("Recorded rotor rps:", r1_r2_r3_r4_rps)
-        self.rotor_rps_list.append(r1_r2_r3_r4_rps)
-        state.extend(r1_r2_r3_r4_rps)
+        if r1_r2_r3_r4_rps:
+            self.rotor_rps_list.append(r1_r2_r3_r4_rps)
+
+
+            state.extend(r1_r2_r3_r4_rps)
+
+            # Compute the individual torques
+            Ct =  1.54*10.0**(-2.0)
+            rho = 1.225
+            A = 0.03
+            k = Ct * rho * A
+            d = 0.3
+            F = k * np.mean(np.abs(r1_r2_r3_r4_rps)**2)
+            
+            tau_x, tau_y, tau_z = self.compute_torques(r1_r2_r3_r4_rps[0], r1_r2_r3_r4_rps[1], 
+                                                       r1_r2_r3_r4_rps[2], r1_r2_r3_r4_rps[3],
+                                                       k, d)
+
+            #print("####### Rotor speed:", np.mean(np.abs(r1_r2_r3_r4_rps)))
+            # Display the results
+            #print(f"Total Thrust: {F} N")
+            #print(f"Controller Roll Torque (τx): {tau_x} Nm")
+            #print(f"Controller Pitch Torque (τy): {tau_y} Nm")
+            #print(f"Controller Yaw Torque (τz): {tau_z} Nm")
+
+            #print("---------------")
+            if len(self.states) > 0:
+                Jw_dot = self.inertia_matrix @ np.array(self.states[-1])[15:18]
+                #print(f"Controller Roll Torque (τx): {tau_x} Nm")
+                #print(f"Controller Pitch Torque (τy): {tau_y} Nm")
+                #print(f"Controller Yaw Torque (τz): {tau_z} Nm")
+        
+        # append angular accelerations
 
         self.states.append(state)
 
@@ -58,11 +106,23 @@ class UAV():
         # update current time
         self.timestamp_list.append(timestep)
 
+    def compute_torques(self, omega_0, omega_1, omega_2, omega_3, k, d):
+        # roll torque (τ_x)
+        tau_x = k * d * (omega_0**2 + omega_1**2 - omega_2**2 - omega_3**2)
+        # pitch torque (τ_y)
+        tau_y = k * d * (omega_3**2 + omega_1**2 - omega_0**2 - omega_2**2)
+        # yaw torque (τ_z)
+        tau_z = -k * (omega_1**2 - omega_0**2 + omega_3**2 - omega_2**2)
+    
+        return tau_x, tau_y, tau_z
+
 
     def get_sensor_idx(self, sensor_names):
         """
         Returns sensor index or list of sensor indices if list of names is passed.
         """
+        if sensor_names == None:
+            return None
         if isinstance(sensor_names, list):
             result = []
             for sensor_name in sensor_names:
@@ -78,6 +138,8 @@ class UAV():
         """
         Read current value tuple of a sensor or at specified indices of that tuple
         """
+        if sensor_idx == None:
+            return None
         result = []
         sensor_tuple_data = reply.get_sensor_output(sensor_idx)
 
@@ -95,6 +157,8 @@ class UAV():
         """
         Read multiple sensor tuples, or each at tuple_indices of each tuple
         """
+        if sensor_indices == None:
+            return None
         result = []
         if not tuple_indices:
             for sensor_idx in sensor_indices:
@@ -208,7 +272,24 @@ def plot_uav_statistics(uav_list, begin=None, end=None):
         
 
         
+def init_two_uavs(controller):
+    ext_force_sensors = ["force_sensor_body_z", "force_sensor_rotor_1_z", "force_sensor_rotor_2_z", "force_sensor_rotor_3_z", "force_sensor_rotor_4_z"]
+    jft_sensors = ["jft_sensor_body", "jft_sensor_imu",  "jft_sensor_rotor1", "jft_sensor_rotor2", "jft_sensor_rotor3", "jft_sensor_rotor4"]
+    joint_sensors = ["joint_sensor_r1", "joint_sensor_r2", "joint_sensor_r3", "joint_sensor_r4",]
 
+    # setup UAVs
+    uav_1_ext_z_force_sensors = ["uav_1_" + ext_sen_name for ext_sen_name in ext_force_sensors]
+    uav_2_ext_z_force_sensors = ["uav_2_" + ext_sen_name for ext_sen_name in ext_force_sensors]
+    uav_1_jft_sensors = ["uav_1_" + ext_sen_name for ext_sen_name in jft_sensors]
+    uav_2_jft_sensors = ["uav_2_" + ext_sen_name for ext_sen_name in jft_sensors]
+    uav_1_joint_sensors = ["uav_1_" + joint_sen for joint_sen in joint_sensors]
+    uav_2_joint_sensors = ["uav_2_" + joint_sen for joint_sen in joint_sensors]
+
+
+    uav_1 = UAV("producer", controller, "controller1", "imu1", uav_1_ext_z_force_sensors, uav_1_jft_sensors, uav_1_joint_sensors)
+    uav_2 = UAV("sufferer", controller, "controller2", "imu2", uav_2_ext_z_force_sensors, uav_2_jft_sensors, uav_2_joint_sensors)
+
+    return uav_1, uav_2
 
 
 

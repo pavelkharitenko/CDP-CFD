@@ -6,10 +6,7 @@ sys.path.append('../../utils/')
 from utils import *
 
 dataset_paths = [
-    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\precise-data-collection\2024-11-18-15-45-47-Precise-collection-descriptive-strategyintermediate-120.0sec-48001-ts.p",
-    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\precise-data-collection\2024-11-18-16-38-22-Precise-collection-legacy-treeintermediate-300.0sec-120001-ts.p",
-    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\precise-data-collection\2024-11-18-18-33-13-Precise-collection-humble-filterintermediate-240.0sec-96001-ts.p",
-    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\precise-data-collection\2024-11-18-19-07-55-Precise-collection-bone-bookintermediate-120.0sec-48001-ts.p"
+    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\precise-data-collection\2024-11-19-21-23-22-Precise-collection-tart-slalom-800.0sec-115136-ts.p"
 ]
 
 uav_1_states = []
@@ -19,10 +16,10 @@ uav_2_states = []
 for path in dataset_paths:
     exp = load_forces_from_dataset(path)
     uav_1, uav_2 = exp['uav_list']
-    uav_1_states.extend(uav_1.states[3000:0])
-    uav_2_states.extend(uav_2.states[3000:0])
+    uav_1_states.extend(uav_1.states[0:])
+    uav_2_states.extend(uav_2.states[0:])
 
-plot = False
+plot = True
 mass = 3.035
 g = -9.85
 mg = np.array([0,0,mass*g])
@@ -61,8 +58,13 @@ if plot:
     plt.show()
 
 
+u2_z_dw_forces = np.array([[0,0,z_force] for z_force in u2_z_dw_forces])
 
 # 4 create label:
+
+# label format v1: [state_uav1, state_uav2, dw_forces]
+#np.savez(f"precise_200Hz_80_005_flyby_below_{len(uav_1_states)}ts_labels", uav_1_states=uav_1_states, uav_2_states=uav_2_states, dw_forces=u2_z_dw_forces)
+
 
 
 

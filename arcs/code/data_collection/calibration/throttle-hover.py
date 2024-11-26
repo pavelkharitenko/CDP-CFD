@@ -10,8 +10,23 @@ from uav import *
 from utils import *
 
 
+
+
 def moving_average(data, window_size):
     return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
+
+
+
+def compute_torques(omega_0, omega_1, omega_2, omega_3, k, d):
+        # roll torque (τ_x)
+        tau_x = k * d * (omega_0**2 + omega_1**2 - omega_2**2 - omega_3**2)
+        # pitch torque (τ_y)
+        tau_y = k * d * (omega_3**2 + omega_1**2 - omega_0**2 - omega_2**2)
+        # yaw torque (τ_z)
+        tau_z = -k * (omega_1**2 - omega_0**2 + omega_3**2 - omega_2**2)
+    
+        return tau_x, tau_y, tau_z
+
 
 def main(controller):
 
@@ -19,7 +34,7 @@ def main(controller):
     mass = 3.035 # P600 weight
 
     # Create simulation controller
-    controller = simcontrol2.Controller('localhost', 25556)
+    controller = simcontrol2.Controller('localhost', 25557)
 
     # Retrieve px4 actuator index (px4 is a class of actuator)
     px4_index = controller.get_actuator_info('controller').index
@@ -31,8 +46,8 @@ def main(controller):
     r3_joint_sensor_idx = controller.get_sensor_info("uav_2_r3_joint_sensor").index
     r4_joint_sensor_idx = controller.get_sensor_info("uav_2_r4_joint_sensor").index
 
-    hovertime = 0.0
-    throttle = 0.362
+    hovertime = 2.5
+    throttle = 0.3347 # 0.3325 too low, 0.335 too high
 
     # Start simulation
     controller.clear()
@@ -51,17 +66,21 @@ def main(controller):
     avg_rps_list = []
 
     # Simulation loop, simulating for 20 seconds (simulation time, not physical time)
-    while (t < 20.0):
+    while (t < 10.0):
         # Set px4 control input to do position tracking of a circle trajectory
         # See actuator.md for details of input
         
         if t > hovertime:
 
-            #px4_input = (2.0, 0.0, 0.0, 0.0, throttle) # This is the actuator input vector
-            px4_input = (0.0, 0.0, 0.0, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            px4_input = (3.0, 1.0, 0.0, 0.0, throttle) # This is the actuator input vector
+            #px4_input = (0.0, 0.0, 0.0, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            #px4_input = (0.0, nan, nan, nan, 0.0, 1.0, 0.0, nan, nan, nan, 1.570796326794897, nan) 
+
 
         else:
-            px4_input = (0.0, 0.0, 0.0, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            px4_input = (0.0, 0.0, 0.0, 2.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            #px4_input = (0.0, nan, nan, nan, 0.0, 1.0, 0.0, nan, nan, nan, 1.570796326794897, nan) 
+
 
         # Simulate a control period, giving actuator input and retrieving sensor output
         reply = controller.simulate(steps_per_call,  {px4_index: px4_input})
@@ -82,8 +101,31 @@ def main(controller):
 
         
         #print(f'x: {p_x:.2f}, y: {p_y:.2f}, z: {p_z:.2f}')
+        #if np.round(t,1) % .1 == 0.0:
+
+        print("Time", t)
+        print("Avg rotor speed", avg_rps_list[-1])
+        print("Predicted tot. Thrust with fitted function:", rps_to_thrust_p005_mrv80(avg_rps_list[-1]))
+        Ct =  0.000362
+        rho = 1.225
+        A = 0.11948
+        k = Ct * rho * A
+        d = 0.3
+        F = k * np.mean(np.abs(avg_rps_list[-1])**2)
+
+        tau_x, tau_y, tau_z = compute_torques(r1_rps, r2_rps, r3_rps, r4_rps, k, d)
+
         
-        print(t)
+        
+        #print("####### Rotor speed:", np.mean(np.abs(avg_rps_list[-1])))
+        # Display the results
+        #print(f"Computed Total Thrust from constants: {4*F} N")
+        print(f"Roll Torque (τx) {tau_x} Nm")
+        print(f"Pitch Torque (τy): {tau_y} Nm")
+        print(f"Yaw Torque (τz): {tau_z} Nm")
+        print("------------")
+           # print("Roll torque imu:", )
+
 
     # Clear simulator
     print("Finished, clearing...")

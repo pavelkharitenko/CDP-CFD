@@ -3,32 +3,29 @@
 # Flight with Neural Network Downwash Prediction, arXiv:2304.07794v2
 # Their implementation found at https://github.com/Li-Jinjie/ndp_nmpc_qd
 #----------------------------------
-import torch, sys, time
-import torch.nn as nn
-from torch.utils.data import DataLoader
+import torch, sys
 from model import ShallowEquivariantPredictor, F_tnsr, F
 from dataset import SO2Dataset
-import numpy as np
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from utils import *
 sys.path.append('../../../../../notify/')
-from notify_script_end import notify_ending
+#from notify_script_end import notify_ending
+
 
 SAVE_MODEL = True
 
-#load_model = r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-10-19-44-57-NDP-Li-Model-sn_scale-4-194k-datapoints-corrected-bias-salty-instructor40000_eps.pth"
 load_model = None
 
 #seed = 0
 #torch.manual_seed(seed)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 60000
-evaluate_at_l_epochs = 1000
+n_epochs = 40000
+evaluate_at_l_epochs = 100
 save_at_m_epochs = 20000
 
 lr = 1e-4
-sn_gamma = None
+sn_gamma = 6
  
 def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimizer, loss_fn):
 
@@ -94,19 +91,9 @@ def test(X_val,Y_val, model, loss_fn):
 
 def train():
     
-    exp_name = init_experiment(f"SO2-Model-sn_scale-{str(sn_gamma)}")
+    exp_name = init_experiment(f"SO2-Model-below-sn_scale-{str(sn_gamma)}")
 
-    dataset = SO2Dataset([
-    #r"datasets\2024-10-06-15-44-22-ndp-2-P600-forgiving-parameter-intermediate-savingsec-35000-ts.p",
-    #r"datasets\2024-10-06-17-41-31-ndp-2-P600-wan-osprey-intermediate-savingsec-30000-ts.p",
-    #r"datasets\2024-10-07-10-23-45-ndp-2-P600-low-dry-data-intermediate-savingsec-30000-ts.p",
-    #r"datasets\2024-10-07-14-10-34-ndp-2-P600-mid-atomic-brass-intermediate-savingsec-35000-ts.p",
-    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\2024-10-08-15-38-29-Dataset-NDP-2-P600-flush-frank-intermediate-savingsec-30000-ts.p",
-    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\data\2024-10-08-14-27-23-Dataset-NDP-2-P600-optimal-normal-intermediate-savingsec-25000-ts.p",
-    r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\data\two-P600-both-moving-100Hz\2024-10-08-15-38-29-Dataset-NDP-2-P600-flush-frank-720.0sec-72001-ts.p",
-    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\data\two-P600-both-moving-100Hz\2024-10-08-15-38-29-Dataset-NDP-2-P600-flush-frank-intermediate-savingsec-10000-ts.p"
-    ],
-    extract_twice=True)
+    dataset = SO2Dataset(r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\precise-data-collection\precise_200Hz_80_005_flyby_below_115136ts_labels.npz")
 
 
     x_train, x_val, y_train, y_val = train_test_split(dataset.x, dataset.y, train_size=0.75, test_size=0.25, shuffle=True)
@@ -147,7 +134,7 @@ def train():
 
             val_err = test(x_val, y_val, model, loss_fn)
             train_errors.append(tr_err)
-            print(train_errors)
+            #print(train_errors)
             val_errors.append(val_err)
 
             print(f'training loss: {train_errors[-1]} \nvalidation loss: {val_errors[-1]}')
@@ -155,7 +142,7 @@ def train():
         # save every m epochs
         if epoch % save_at_m_epochs == 0 and epoch > 0:
             if SAVE_MODEL:
-                notify_ending(f'{exp_name} at {epoch}/{n_epochs} ,\n training loss: {train_errors[-1]} \n validation loss: {val_errors[-1]}')
+                #notify_ending(f'{exp_name} at {epoch}/{n_epochs} ,\n training loss: {train_errors[-1]} \n validation loss: {val_errors[-1]}')
                 torch.save(model.state_dict(), exp_name + str(epoch) +"_eps"  + ".pth")
             
 
@@ -167,7 +154,7 @@ def train():
         print("Training finished, saving...", final_model_name)
         torch.save(model.state_dict(), final_model_name)
 
-    notify_ending(f'FINISHED TRAINING {final_model_name}, \n training loss: {train_errors[-1]} \n validation loss: {val_errors[-1]}')
+    #notify_ending(f'FINISHED TRAINING {final_model_name}, \n training loss: {train_errors[-1]} \n validation loss: {val_errors[-1]}')
 
     
     # save or evaluate model if necessary

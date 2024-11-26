@@ -10,15 +10,15 @@
       - file_path: "p600_no_collisions.urdf"
         name: "p600"
         initial_position:
-        - 0
-        - 0
-        - 0
-        initial_rotation:
-          angle_radians: 0.0
+        - 0.0
+        - 1.8
+        - 1.1
+        initial_rotation: 
+          angle_radians:  -1.570796326794897
           axis:
+          - 0.0
+          - 0.0
           - 1.0
-          - 0.0
-          - 0.0
         joint_velocities:
           p600__rotor_0_joint:
             - 340.0
@@ -32,23 +32,23 @@
         name: "p600_2"
         initial_position:
         - 0
-        - -1.5
-        - -1.0
+        - 0
+        - 0
         initial_rotation:
-          angle_radians: 0.0
+          angle_radians: 3.14
           axis:
+          - 0.0
+          - 0.0
           - 1.0
-          - 0.0
-          - 0.0
         joint_velocities:
           p600__rotor_0_joint:
-            - 320.0
+            - 340.0
           p600__rotor_1_joint:
-            - 320.0
+            - 340.0
           p600__rotor_2_joint:
-            - -320.0
+            - -340.0
           p600__rotor_3_joint:
-            - -320.0
+            - -340.0
     
      
   fluid:
@@ -474,6 +474,28 @@
       target_skeleton_name: "p600"
       target_body_name: "p600__rotor_3"
       averaging_period: 0.02
+
+    # rotor joint sensors of UAV 1
+    - type: "Joint"
+      name: "uav_1_joint_sensor_r1"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_0_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_1_joint_sensor_r2"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_1_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_1_joint_sensor_r3"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_2_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_1_joint_sensor_r4"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_3_joint"
+      mode: "Velocity"
     
     # UAV 2 JFT Body, IMU and rotor sensors
     - type: "JointForceTorque"
@@ -506,3 +528,25 @@
       target_skeleton_name: "p600_2"
       target_body_name: "p600__rotor_3"
       averaging_period: 0.02
+
+    # rotor joint sensors of UAV 2
+    - type: "Joint"
+      name: "uav_2_joint_sensor_r1"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_0_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_2_joint_sensor_r2"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_1_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_2_joint_sensor_r3"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_2_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_2_joint_sensor_r4"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_3_joint"
+      mode: "Velocity"
