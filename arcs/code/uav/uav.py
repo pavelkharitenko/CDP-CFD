@@ -7,17 +7,24 @@ class UAV():
     def __init__(self, uav_name, controller, controller_name, imu_name, external_force_sensors_names, joint_force_torque_sensor_names, rotor_joint_sensor_names):
         # init properties
         self.total_mass = 3.3035
-        self.inertia_matrix = np.array([
+        self.inertia_matrix_body = np.array([
             [0.05487, 0,       0],
             [0,       0.05487, 0],
             [0,       0,       0.1027]
         ])
-        self.inertia_matrix_rotors = intertia_total = np.array([
+        self.inertia_matrix_body_rotors = np.array([
             [0.0566739, 0, 0],
             [0, 0.05776242, 0],
             [0, 0, 0.10739602]
         ])
 
+        self.inertia_matrix_imu = np.array([
+            [1e-5, 0, 0],
+            [0, 1e-5, 0],
+            [0, 0, 1e-5]
+        ])
+
+        self.inertia_matrix_complete = self.inertia_matrix_body_rotors + self.inertia_matrix_imu
 
         self.name = uav_name
         self.controller = controller
@@ -48,10 +55,10 @@ class UAV():
         # read xyz pos, xyz vel, xyz acc, yaw-pitch-roll, rot.  and torques:
         state = self.read_sensor(reply, self.imu_idx, 
                                  [0,1,2, 6,7,8, 12,13,14, # [0,1,2, 3,4,5, 6,7,8] xyz pos, vel, acc
-                                  3,4,5, # [9,10,11] yaw, pitch, roll
-                                  15,16,17,  # [12,13,14] roll_dot, pitch_dot, yaw_dot
-                                  18,19,20,21]) # [15,16,17,18] quaternions w, x, y, z
-                                # ([19,20,21,22]) rotor velocities (in rad, per second)
+                                  3,4,5, 9,10,11, # [9,10,11, 12,13,14] yaw, pitch, roll, w_roll, w_pithc, w_yaw,
+                                  15,16,17,  # [15,16,17] roll_dot, pitch_dot, yaw_dot
+                                  18,19,20,21]) # [18,19,20,21] quaternions w, x, y, z
+                                # ([22,23,24,25]) rotor velocities (in rad, per second)
         
         
         # update external force sensors of body and 5 rotors
@@ -92,7 +99,7 @@ class UAV():
 
             #print("---------------")
             if len(self.states) > 0:
-                Jw_dot = self.inertia_matrix @ np.array(self.states[-1])[15:18]
+                Jw_dot = self.inertia_matrix_complete @ np.array(self.states[-1])[15:18]
                 #print(f"Controller Roll Torque (τx): {tau_x} Nm")
                 #print(f"Controller Pitch Torque (τy): {tau_y} Nm")
                 #print(f"Controller Yaw Torque (τz): {tau_z} Nm")

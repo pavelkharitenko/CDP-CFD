@@ -1421,7 +1421,7 @@ def extract_and_plot_data(data_set_paths=None,
     # 1 extract necessary parameters from uav states
     rel_state_vector_list = np.array(uav_1_states) - np.array(uav_2_states)
     u2_rotations = [R.from_euler('xyz', [yaw_pitch_roll[2], yaw_pitch_roll[1], yaw_pitch_roll[0]], degrees=False) for yaw_pitch_roll in np.array(uav_2_states)[:,9:12]]
-    u2_avg_rps = np.mean(np.abs(np.array(uav_2_states)[:,19:23]), axis=1)
+    u2_avg_rps = np.mean(np.abs(np.array(uav_2_states)[:,22:26]), axis=1)
     u2_rps_rot = zip(u2_avg_rps, u2_rotations)
 
     
@@ -1431,7 +1431,7 @@ def extract_and_plot_data(data_set_paths=None,
     # 2 compute uav actual forces, smooth them, and compute controller z-axis forces, and their residual disturbance
     u2_accelerations = np.array(uav_2_states)[:,8]
     u2_z_forces = u2_accelerations * mass
-    smoothed_u2_z_forces = smooth_with_savgol(u2_z_forces, window_size=61, poly_order=1)
+    smoothed_u2_z_forces = smooth_with_savgol(u2_z_forces, window_size=21, poly_order=1)
     u2_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[2] + (g*mass) for (avg_rps, u2_rotations) in u2_rps_rot]
     u2_z_dw_forces = smoothed_u2_z_forces - u2_thrusts
 
@@ -1499,7 +1499,10 @@ def extract_and_plot_data(data_set_paths=None,
 
     # label format v1: [state_uav1, state_uav2, dw_forces]
     if save:
-        np.savez(f"precise_200Hz_80_005_flyby_below_{len(uav_1_states)}ts_labels", uav_1_states=uav_1_states, uav_2_states=uav_2_states, dw_forces=u2_z_dw_forces)
+        np.savez(f"raw_data_1_flybelow_200Hz_80_005_len{len(uav_1_states)}ts", 
+                 uav_1_states=uav_1_states, 
+                 uav_2_states=uav_2_states, 
+                 dw_forces=u2_z_dw_forces)
 
 
 
@@ -1553,7 +1556,7 @@ def compute_rmse(array1, array2, label=None):
         print(f"RMSE is", str(rmse))
     return rmse
 
-def plot_uav_angles(time, roll, pitch, yaw):
+def plot_uav_angles(time, roll, pitch, yaw, title):
     """
     Plots the roll, pitch, and yaw angles of a UAV over time.
     
@@ -1567,7 +1570,6 @@ def plot_uav_angles(time, roll, pitch, yaw):
         raise ValueError("Time, roll, pitch, and yaw arrays must have the same length.")
     
     plt.figure(figsize=(12, 6))
-
     # Plot roll
     plt.plot(time, roll, label="Roll", color="blue", linewidth=1.5)
     
@@ -1579,8 +1581,8 @@ def plot_uav_angles(time, roll, pitch, yaw):
 
     # Labels and grid
     plt.xlabel("Time (s)")
-    plt.ylabel("Angle (degrees or radians)")
-    plt.title("UAV Roll, Pitch, and Yaw Angles Over Time")
+    plt.ylabel("Angle (degrees)")
+    plt.title(title)
     plt.legend()
     plt.grid(True)
     
@@ -1588,19 +1590,20 @@ def plot_uav_angles(time, roll, pitch, yaw):
     #plt.show()
 
 
-def compute_torques(omega_0, omega_1, omega_2, omega_3):
-    Ct =  1.54*10.0**(-2.0)
+def compute_torques(r1, r2, r3, r4):
+    # r1 forward left, r3 forward right, r4 back left, r2 back right
+    Ct =  0.000362
     rho = 1.225
-    A = 0.03
+    A = 0.11948
     k = Ct * rho * A
     d = 0.3
 
 
     # roll torque (τ_x)
-    tau_x = k * d * (omega_0**2 + omega_1**2 - omega_2**2 - omega_3**2)
+    tau_x = k * d * (r2**2 + r3**2 - r1**2 - r4**2)
     # pitch torque (τ_y)
-    tau_y = k * d * (omega_3**2 + omega_1**2 - omega_0**2 - omega_2**2)
+    tau_y = k * d * (-r1**2 - r3**2 + r2**2 + r4**2) # forward tilt is positive
     # yaw torque (τ_z)
-    tau_z = -k * (omega_1**2 - omega_0**2 + omega_3**2 - omega_2**2)
+    tau_z = -k * d*(r1**2 - r3**2 + r2**2 - r4**2)
 
     return tau_x, tau_y, tau_z

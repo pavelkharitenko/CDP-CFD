@@ -21,11 +21,11 @@ def main(controller):
 
     # exp specific
     SAVE_EXP = False
-    SIM_MAX_DURATION = 6.0
+    SIM_MAX_DURATION = 30.0
 
     SAVE_INTERVALL = 6.0
     # episode specific
-    HOVER_DURATION = 3.5
+    HOVER_DURATION = 2.5
     ITERATION_TIME = HOVER_DURATION + 2.5
     exp_name = init_experiment(MANUEVER_NAME)
     total_iterations = 0
@@ -59,8 +59,8 @@ def main(controller):
     yaw_uav_1 = 1.570796326794897
 
     # sample initial z-position for uav 2
-    y_vel_max = 2.0
-    y_vel_min = 0.5
+    y_vel_max = 1.0
+    y_vel_min = 1.0
     y_pos_max = 1.2
     initial_point = sample_3d_point(1.0) # returns at negative side a point p=[N(), N(), N()]
     sampled_y_vel = sample_from_range(y_vel_min,y_vel_max)
@@ -169,19 +169,41 @@ def main(controller):
 
 
 
-    extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=False)
-    extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=True)
+    extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=False, save=True)
+    #extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=True)
+    
+    # torque debug
+    
     yaw, pitch, roll = np.array(uav_2.states)[:,9], np.array(uav_2.states)[:,10], np.array(uav_2.states)[:,11]
+    to_deg = 180/np.pi
+    plot_uav_angles(time_seq, roll*to_deg, pitch*to_deg, yaw*to_deg - 90.0, "Roll pitch yaw orientations measured from IMU (angles) correct")
+    
     # compute controller torques
     u_rollpitchyaw_torques = np.array([(compute_torques(r1r2r3r4[0], r1r2r3r4[1],r1r2r3r4[2],r1r2r3r4[3]))
-                                        for r1r2r3r4 in np.array(uav_2.states)[:,19:23]])
+                                        for r1r2r3r4 in np.array(uav_2.states)[:,22:26]])
+    
+    # compute gyroscopic torque
+    w_rpy = np.array(np.array(uav_2.states)[:,12:15])
+    gyroscopic_torque = np.array([np.cross(uav_2.inertia_matrix_complete @ w, w) for w in w_rpy])
+    u_rollpitchyaw_torques_no_gyroscopic_torques = u_rollpitchyaw_torques - gyroscopic_torque
     
     # compute actual torques of uav
-    actual_rollpitchyaw_torques = np.array([DRONE_TOTAL_MASS*w_xyz_dot for w_xyz_dot in np.array(uav_2.states)[:,12:15]])
-    plot_uav_angles(time_seq, roll, pitch, yaw)
-    plot_uav_angles(time_seq, u_rollpitchyaw_torques[:,0], u_rollpitchyaw_torques[:,1],u_rollpitchyaw_torques[:,2])
-    plot_uav_angles(time_seq, actual_rollpitchyaw_torques[:,0], actual_rollpitchyaw_torques[:,1],actual_rollpitchyaw_torques[:,2])
-
+    actual_rollpitchyaw_torques = np.array([uav_2.inertia_matrix_complete @ w_xyz_dot for w_xyz_dot in np.array(uav_2.states)[:,15:18]])
+    
+    plot_uav_angles(time_seq, gyroscopic_torque[:,0], gyroscopic_torque[:,1], gyroscopic_torque[:,2], "gyroscopic torques")
+    
+    plot_uav_angles(time_seq, u_rollpitchyaw_torques[:,0], u_rollpitchyaw_torques[:,1], u_rollpitchyaw_torques[:,2],
+                    "controller input torques roll pitch yaw, computed from rotor speed differences (maybe wrong)")
+    
+    plot_uav_angles(time_seq, u_rollpitchyaw_torques_no_gyroscopic_torques[:,0], u_rollpitchyaw_torques_no_gyroscopic_torques[:,1], u_rollpitchyaw_torques_no_gyroscopic_torques[:,2],
+                    "controller input torques (from rotor speeds) without gyroscopic torque")
+    plot_uav_angles(time_seq, actual_rollpitchyaw_torques[:,0], actual_rollpitchyaw_torques[:,1],actual_rollpitchyaw_torques[:,2],
+                    "UAV total torques Roll pitch yaw, computed from IMU and inertia matrix (correct)")
+    plot_uav_angles(time_seq, smooth_with_savgol(actual_rollpitchyaw_torques[:,0], window_size=21, poly_order=1),
+                     smooth_with_savgol(actual_rollpitchyaw_torques[:,1], window_size=31, poly_order=1),
+                     smooth_with_savgol(actual_rollpitchyaw_torques[:,2], window_size=31, poly_order=1),
+                    "Smoothed UAV total torques Roll pitch yaw, computed from IMU and inertia matrix (correct)")
+    
     plt.show()
 
 
