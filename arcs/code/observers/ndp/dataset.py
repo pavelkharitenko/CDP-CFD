@@ -15,20 +15,25 @@ class DWDataset(torch.utils.data.Dataset):
         return self.x[index,:], self.y[index,:]
         
     def extract_ndp_labels(self):
-        self.N = 0
-        x, y = [], []
-        
-        data = np.load(self.exp_paths)
-        uav_1_states, uav_2_states = data['uav_1_states'], data['uav_2_states']
-        
-        x = uav_1_states[:,:6] - uav_2_states[:,:6]
-        y = data['dw_forces']
+        x = np.empty((0,6))
+        y = np.empty((0,3))
+        for exp_path in self.exp_paths:
+            self.N = 0
+            
+            
+            data = np.load(exp_path)
+            uav_1_states, uav_2_states = data['uav_1_states'], data['uav_2_states']
+            
+            x_i = uav_1_states[:,:6] - uav_2_states[:,:6] # compute rel. state of pos. and vel.
+            y_i = data['dw_forces']
 
-        
+            x = np.vstack((x, x_i))
+            y = np.vstack((y,y_i))
 
 
-        #print("extracted total X data of length:", len(x))
-        #print("extracted total Y labels of length:", len(y))
+
+        print("extracted total X data of length:", len(x))
+        print("extracted total Y labels of length:", len(y))
 
             
             

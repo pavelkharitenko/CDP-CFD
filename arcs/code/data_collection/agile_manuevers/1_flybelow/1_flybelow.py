@@ -20,8 +20,8 @@ def main(controller):
     nan = float('NaN')
 
     # exp specific
-    SAVE_EXP = False
-    SIM_MAX_DURATION = 30.0
+    SAVE_EXP = True
+    SIM_MAX_DURATION = 300.0
 
     SAVE_INTERVALL = 6.0
     # episode specific
@@ -56,11 +56,11 @@ def main(controller):
    
 
     next_way_point_uav_1 = [0.0,-1.5,1.5] # uav 1 hover at (0,-1,0.7)
-    yaw_uav_1 = 1.570796326794897
-
+    yaw_uav_1 = 4.71238898038469
+    yaw_uav_2 = 1.570796326794897
     # sample initial z-position for uav 2
-    y_vel_max = 1.0
-    y_vel_min = 1.0
+    y_vel_max = 2.0
+    y_vel_min = 0.5
     y_pos_max = 1.2
     initial_point = sample_3d_point(1.0) # returns at negative side a point p=[N(), N(), N()]
     sampled_y_vel = sample_from_range(y_vel_min,y_vel_max)
@@ -68,8 +68,8 @@ def main(controller):
     selected_velocities.append(sampled_y_vel)
     ITERATION_TIME = HOVER_DURATION + 10.0/sampled_y_vel
 
-    px4_input_1 = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, 0.0, nan) # uav 1 hover at (0,0,0)
-    px4_input_2 = (0.0, initial_point[0], initial_y_pos, initial_point[2]-2.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan) # uav 2 hover at (x,0,z)
+    px4_input_1 = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan) # uav 1 hover at (0,0,0)
+    px4_input_2 = (0.0, initial_point[0], initial_y_pos, initial_point[2]-2.0, nan, nan, nan, nan, nan, nan, yaw_uav_2, nan) # uav 2 hover at (x,0,z)
 
 
     # each iteration sends control signal
@@ -86,7 +86,7 @@ def main(controller):
 
         # begin iteration
         #print("beginning iteration at global time",np.round(curr_sim_time,2))
-        px4_input_2 = (0.0, nan, nan, nan, 0.0, sampled_y_vel, 0.0, nan, nan, nan, yaw_uav_1, nan)
+        px4_input_2 = (0.0, nan, nan, nan, 0.0, sampled_y_vel, 0.0, nan, nan, nan, yaw_uav_2, nan)
         
             
 
@@ -139,8 +139,8 @@ def main(controller):
             selected_velocities.append(sampled_y_vel)
             ITERATION_TIME = HOVER_DURATION + 12.0/sampled_y_vel
 
-            px4_input_1 = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, 0.0, nan) # uav 1 hover at (0,0,0)
-            px4_input_2 = (0.0, initial_point[0], initial_y_pos, initial_point[2]-2.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan) # uav 2 hover at (x,0,z)
+            px4_input_1 = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan) # uav 1 hover at (0,0,0)
+            px4_input_2 = (0.0, initial_point[0], initial_y_pos, initial_point[2]-2.0, nan, nan, nan, nan, nan, nan, yaw_uav_2, nan) # uav 2 hover at (x,0,z)
             iteration_time = 0.0
             total_iterations += 1
             print("### Sim time:", curr_sim_time, "/", SIM_MAX_DURATION, "s", " ## Sim steps:", curr_step ,"/", total_sim_steps, "steps ###")
@@ -162,14 +162,14 @@ def main(controller):
     print("Collected ", len(time_seq), "samples of data,",str(SIM_MAX_DURATION),"s, over", str(total_iterations), "iterations.")
     print("Selected velocities:", selected_velocities)
 
-    if SAVE_EXP:
-        uav_1.controller, uav_2.controller = None, None
-        exp_path = save_experiment(exp_name, [uav_1, uav_2], True,  SIM_MAX_DURATION)
-        print("### Finally saving experiment to ", exp_path)
+    #if SAVE_EXP:
+    #    uav_1.controller, uav_2.controller = None, None
+    #    exp_path = save_experiment(exp_name, [uav_1, uav_2], True,  SIM_MAX_DURATION)
+    #    print("### Finally saving experiment to ", exp_path)
 
 
 
-    extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=False, save=True)
+    extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=False, save=SAVE_EXP)
     #extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=True)
     
     # torque debug

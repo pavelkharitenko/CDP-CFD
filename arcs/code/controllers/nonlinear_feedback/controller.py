@@ -15,14 +15,15 @@ class NonlinearFeedbackController:
         self.target_yaw = target_yaw
         self.g = -9.81
         self.throttle_hover = 0.3347 # for 80.0, and 0.05 res
+        self.TWR = self.throttle_hover / (self.uav_mass * -self.g) # thrust to weight ratio
         
 
     def set_xyz_force(self, x_force, y_force, z_force):
         """ Setting 0,0,0 means hovering"""
 
-        x_acc = x_force/self.uav_mass
-        y_acc = y_force/self.uav_mass
-        z_acc = z_force/self.uav_mass
+        x_acc = x_force/self.uav_mass + 1e-12
+        y_acc = y_force/self.uav_mass + 1e-12
+        z_acc = z_force/self.uav_mass + 1e-12
 
         pitch = np.arctan((x_acc*np.cos(self.target_yaw) + y_acc * np.sin(self.target_yaw))
                          / (z_acc + self.g))
@@ -31,8 +32,9 @@ class NonlinearFeedbackController:
         roll = np.arctan((np.sin(pitch)*(y_acc*np.cos(self.target_yaw) - x_acc*np.sin(self.target_yaw)))
                          / x_acc * np.cos(self.target_yaw) + y_acc * np.sin(self.target_yaw))
 
-        U = self.uav_mass*np.sqrt(x_acc**2 + y_acc**2 + (z_acc + self.g)**2)
-        return roll, pitch, self.target_yaw, U
+        thrust = self.uav_mass*np.sqrt(x_acc**2 + y_acc**2 + (z_acc + self.g)**2) # magnitude
+        
+        return roll, pitch, self.target_yaw, thrust
 
     def align_vector(self, target_vector, thrust_vector):
         """

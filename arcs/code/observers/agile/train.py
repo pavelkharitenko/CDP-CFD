@@ -1,49 +1,34 @@
-#----------------------------------
-# NDP model implemented from Li et al. Nonlinear MPC for Quadrotors in Close-Proximity 
-# Flight with Neural Network Downwash Prediction, arXiv:2304.07794v2
-# Their implementation found at https://github.com/Li-Jinjie/ndp_nmpc_qd
-#----------------------------------
-import torch, sys
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from model import DWPredictor
-from dataset import DWDataset
-import numpy as np
-from sklearn.model_selection import train_test_split
 
-import matplotlib.pyplot as plt
+import torch, sys
+from model import AgileLeanPredictor
+from dataset import AgileLeanDataset
+from sklearn.model_selection import train_test_split
+sys.path.append('../../utils/')
+
 from utils import *
 
 sys.path.append('../../../../../notify/')
 from notify_script_end import notify_ending
 
-SAVE_MODEL = False
-
-#load_model = r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-10-19-44-57-NDP-Li-Model-sn_scale-4-194k-datapoints-corrected-bias-salty-instructor40000_eps.pth"
+SAVE_MODEL = True
 load_model = None
 
-seed = 123
+#seed = 123
 #torch.manual_seed(seed)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 2000
+n_epochs = 60000
 evaluate_at_l_epochs = 100
-save_at_m_epochs = 10000
+save_at_m_epochs = 15000
 
 lr = 1e-4
 #sn_gamma = 4 # scale factor for spectral normalization
-sn_gamma = 4
+sn_gamma = None
  
 def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimizer, loss_fn):
 
     model.train()
-    
-    
-
-    # get batch (x,y)
-    
-    #print("batch nr:", batch)
     X, Y = X_train.to(device), Y_train.to(device)
-
+    Y = Y.unsqueeze(1)
     # compute forward pass
     y_pred = model(X)
 
@@ -69,9 +54,8 @@ def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimize
                     param.data = (param / spec_norm) * sn_gamma
     
     
-    #print(f"Mean train error: {mean_train_error}")
     return ep_loss
-    # print epoch statistics:
+    
     
 
 def test(X_val,Y_val, model, loss_fn):
@@ -79,6 +63,7 @@ def test(X_val,Y_val, model, loss_fn):
     
     with torch.no_grad():
         X, Y = X_val.to(device), Y_val.to(device)
+        Y = Y.unsqueeze(1)
         y_pred = model(X)
         val_error = loss_fn(y_pred, Y).item()
     return val_error
@@ -91,38 +76,42 @@ def train():
     # list of tuples: ([px,py,pz, vx,vy,vz], [fx,fy,fz]) 
     # other vehicle - ego vehicle: [0,0,1]->[0,0,-6.5]
 
-    exp_name = init_experiment(f"NDP-predictor-sn_scale-{str(sn_gamma)}-300k-ts-flyby")
+    exp_name = init_experiment(f"Agile-124-sn-{str(sn_gamma)}-123")
 
-    dataset = DWDataset(
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\precise-data-collection\precise_200Hz_80_005_flyby_below_115136ts_labels.npz"
-        )
+    dataset = AgileLeanDataset([
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz"
+        ])
+    
+    
 
-
-    x_train, x_val, y_train, y_val = train_test_split(dataset.x, dataset.y, train_size=0.75, test_size=0.25,
+    x_train, x_val, y_train, y_val = train_test_split(dataset.x, dataset.y, 
+                                                      train_size=0.75, test_size=0.25,
                                                       shuffle=True)
 
     
 
     # overfit on small subset first
-    #x_train = x_train[:20]
-    #x_val = x_val[:20]
-    #y_train = y_train[:20]
-    #y_val = y_val[:20]
+    x_train = x_train[0:-1:2]
+    x_val = x_val[0:-1:2]
+    y_train = y_train[0:-1:2]
+    y_val = y_val[0:-1:2]
+
+    print("Length of dataset", len(x_train))
 
 
     # init or load model, optimizer and loss 
     if load_model:
-        model = DWPredictor().to(device)
+        model = AgileLeanPredictor().to(device)
         model.load_state_dict(torch.load(load_model, weights_only=True))
     else:
-        model = DWPredictor().to(device)
+        model = AgileLeanPredictor().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
     loss_fn = torch.nn.MSELoss()
 
-
-    #plot_xy_slices(model)
-    #plot_3D_forces(model)
 
     train_errors, val_errors = [], []
 
@@ -161,15 +150,15 @@ def train():
 
     
     # save or evaluate model if necessary
-    print(f'\n Final training loss: {train_errors[-1]} \n Final validation loss: {val_errors[-1]}')
+    #print(f'\n Final training loss: {train_errors[-1]} \n Final validation loss: {val_errors[-1]}')
 
     plot_NN_training(train_errors, val_errors)
-    model.eval()
+    #model.eval()
     #print(model(st))
     #plot_xy_slices(model)
-    plot_zy_yx_slices(model)
-    plot_z_slices(model)
-    plot_3D_forces(model)
+    #plot_zy_yx_slices(model)
+    #plot_z_slices(model)
+    #plot_3D_forces(model)
 
 
 

@@ -14,8 +14,11 @@ from scipy.spatial.transform import Rotation as R
 
 sys.path.append('../../../observers/')
 
-from ndp.model import DWPredictor
-from SO2.model import ShallowEquivariantPredictor
+
+
+#from ndp.model import DWPredictor
+#from SO2.model import ShallowEquivariantPredictor
+#from model import DWPredictor
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -27,7 +30,7 @@ def plot_xy_slices(model):
     """
     
     # Plot xy-slices at different Z-values:
-    xy_plane_z_samples = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5]
+    xy_plane_z_samples = [-0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
     xy_range = 1.0 # size of XY plane
     plane_res = 200 # number of points sampled for plotting in one dimension
 
@@ -124,9 +127,9 @@ def plot_xy_slices(model):
 
 def plot_zy_yx_slices(model):
     # Plot xy-slices at different Z-values:
-    xy_plane_z_samples = [-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.1, 1.3, 1.5]
-    xy_range = 1.0 # size of XY plane
-    plane_res = 400 # number of points sampled for plotting in one dimension
+    xy_plane_z_samples = [-0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
+    xy_range = 1.2 # size of XY plane
+    plane_res = 200 # number of points sampled for plotting in one dimension
 
     color="autumn"
     test_f = []
@@ -145,6 +148,7 @@ def plot_zy_yx_slices(model):
         
         xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
         sample_matrix = np.zeros([plane_res**2, 6])
+        sample_matrix[:,5] = 1.0
 
         for i in range(plane_res):
             for j in range(plane_res):
@@ -224,9 +228,9 @@ def plot_zy_yx_slices(model):
 
 def plot_z_slices(model):
     # Plot xy-slices at different Z-values:
-    xy_plane_z_samples = [-1.5, -1.0, -0.75, -0.5, 0.0, 0.5, 1.0, 1.25, 1.5]
+    xy_plane_z_samples = [-0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
     xy_range = 1.0 # size of XY plane
-    plane_res = 400 # number of points sampled for plotting in one dimension
+    plane_res = 200 # number of points sampled for plotting in one dimension
 
     color="autumn"
     test_f = []
@@ -1185,7 +1189,7 @@ def euler_angles_to_quaternion(roll, pitch, yaw):
     yaw -- Yaw angle (in degrees)
     
     Returns:
-    (qx, qy, qz, qw) -- Corresponding quaternion
+    (qw, qx, qy, qz) -- Corresponding quaternion
     """
     # Convert to raidans
     roll *= np.pi/180
@@ -1206,7 +1210,7 @@ def euler_angles_to_quaternion(roll, pitch, yaw):
     qy = cr * sp * cy + sr * cp * sy
     qz = cr * cp * sy - sr * sp * cy
 
-    return qx, qy, qz, qw
+    return qw, qx, qy, qz
 
 
 
@@ -1471,7 +1475,7 @@ def extract_and_plot_data(data_set_paths=None,
     if plot:
         fig = plt.subplot()
         #fig.plot(u2_z_forces, label="UAV's z-axis forces") # unsmoothed
-        plot_array_with_segments(fig, time_seq, smoothed_u2_z_forces, color="blue", roll=roll_iterations, label="controller z-forces")
+        plot_array_with_segments(fig, time_seq, smoothed_u2_z_forces, color="blue", roll=roll_iterations, label="UAV total Z-forces")
         plot_array_with_segments(fig, time_seq, u2_thrusts,  color="orange", roll=roll_iterations, label="controller z-forces")
         plot_array_with_segments(fig, time_seq, u2_z_dw_forces, color="magenta", roll=roll_iterations, label="downwash disturbance forces", overlaps=overlaps)
         
@@ -1498,8 +1502,13 @@ def extract_and_plot_data(data_set_paths=None,
     u2_z_dw_forces = np.array([[0,0,z_force] for z_force in u2_z_dw_forces])
 
     # label format v1: [state_uav1, state_uav2, dw_forces]
+    # find indices where the time array decreases (reset points) for number of iterations
+    reset_indices = np.where(np.diff(time_seq) < 0)[0] + 1  # Add 1 to shift to the start of the next segment
+    reset_indices = np.append([0], reset_indices)  # Include the start of the array as the first segment boundary
+    reset_indices = np.append(reset_indices, len(time_seq))  # Include the end of the array as the last boundary
+    n_itrs = len(reset_indices)
     if save:
-        np.savez(f"raw_data_1_flybelow_200Hz_80_005_len{len(uav_1_states)}ts", 
+        np.savez(f"raw_data_3_swapping_200Hz_80_005_len{len(uav_1_states)}ts_{n_itrs}_iterations", 
                  uav_1_states=uav_1_states, 
                  uav_2_states=uav_2_states, 
                  dw_forces=u2_z_dw_forces)
@@ -1607,3 +1616,5 @@ def compute_torques(r1, r2, r3, r4):
     tau_z = -k * d*(r1**2 - r3**2 + r2**2 - r4**2)
 
     return tau_x, tau_y, tau_z
+
+

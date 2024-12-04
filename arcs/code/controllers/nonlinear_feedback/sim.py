@@ -1,98 +1,222 @@
 from simcontrol import simcontrol2
-from uav import UAV
-from code.controllers.force_controller.force_controller import LQRController
+from controller import NonlinearFeedbackController
 import numpy as np
 np.set_printoptions(precision=2)
 np.set_printoptions(suppress=True)
 
-
-# Init
-
-# connect to simulators controller
-ar_controller = simcontrol2.Controller("localhost", 25556)
-nan = float('NaN')
-
-jft_sensors = ["jft_sensor_rotor1", "jft_sensor_rotor2", "jft_sensor_rotor3", "jft_sensor_rotor4"]
-
-# setup UAVs
-uav_2_jft_sensors = ["uav_2_" + ext_sen_name for ext_sen_name in jft_sensors]
-uav = UAV("sufferer", ar_controller, "controller2", "imu2", uav_2_jft_sensors,  dt=0.00125)
+# testing noise filtering techniques, single uav taking off and hovering
+from simcontrol import simcontrol2
+import numpy as np
+import matplotlib.pyplot as plt
+import sys, os
+#sys.path.append('../../observers/baseline/')
+#sys.path.append('../../uav/')
+sys.path.append('../../utils/')
+from uav import *
+from utils import *
 
 
-# Define cost matrices for LQR
-Q = np.eye(7)  # Penalize state deviations
-R = np.eye(4)  # Penalize control effort
-
-# Initialize LQR controller
-lqr_controller = LQRController(uav.A, uav.B, Q, R)
+nfc = NonlinearFeedbackController()
+Fg = -9.81*3.035
+target_acc = [0.0,0.0, 10.0]
 
 
-# Run Simulation
+def moving_average(data, window_size):
+    return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
 
-def run_simulation():
+
+
+def compute_torques(omega_0, omega_1, omega_2, omega_3, k, d):
+        # roll torque (τ_x)
+        tau_x = k * d * (omega_0**2 + omega_1**2 - omega_2**2 - omega_3**2)
+        # pitch torque (τ_y)
+        tau_y = k * d * (omega_3**2 + omega_1**2 - omega_0**2 - omega_2**2)
+        # yaw torque (τ_z)
+        tau_z = -k * (omega_1**2 - omega_0**2 + omega_3**2 - omega_2**2)
+    
+        return tau_x, tau_y, tau_z
+
+
+def main(controller):
+
+    nan = float('NaN')
+    mass = 3.035 # P600 weight
+
+    # Create simulation controller
+    controller = simcontrol2.Controller('localhost', 25557)
+
+    # Retrieve px4 actuator index (px4 is a class of actuator)
+    px4_index = controller.get_actuator_info('controller').index
+
+    # Retrieve imu sensor index (imu is a class of sensor)
+    imu_index = controller.get_sensor_info('imu').index
+    r1_joint_sensor_idx = controller.get_sensor_info("uav_2_r1_joint_sensor").index
+    r2_joint_sensor_idx = controller.get_sensor_info("uav_2_r2_joint_sensor").index
+    r3_joint_sensor_idx = controller.get_sensor_info("uav_2_r3_joint_sensor").index
+    r4_joint_sensor_idx = controller.get_sensor_info("uav_2_r4_joint_sensor").index
+
+    hovertime = 2.5
+    throttle = 0.3347 # 0.3325 too low, 0.335 too high
 
     # Start simulation
-    ar_controller.start()
-    time_step = ar_controller.get_time_step()  # time_step = 0.0001
-    sim_max_duration = 10 # sim seconds
-    total_sim_steps = sim_max_duration / time_step
-    control_frequency = 30.0 # Hz
+    controller.clear()
+    controller.start()
+
+    # Retrive simulation time step (this should be after simulation start)
+    time_step = controller.get_time_step()
+
     # Calculate time steps between one control period
+    control_frequency = 400.0
     steps_per_call = int(1.0 / control_frequency / time_step)
-    print("One Timestep is ", time_step, "||", "Steps per call are", steps_per_call,"||",  "Sim dt is timestep * steps per call =", time_step * steps_per_call)
-    
+
     # Initialize timer
-    curr_sim_time = 0.0
-    curr_step = 0
+    t = 0.0
+    measured_a_zs = []
+    avg_rps_list = []
 
-    time_seq = []
-    px4_commands = (0.0, 
-                        nan,nan,nan, 
-                        nan,nan,nan, 
-                        0.0, 0.0, 0.0,
-                        nan, 0.0)
-
-
-    while curr_sim_time < sim_max_duration:
-
-        time_seq.append(curr_sim_time)
-        print("## Sim time:", np.round(curr_sim_time,3), "/", sim_max_duration, "s", " ## Sim steps:", curr_step ,"/", total_sim_steps, "steps")
-
-
-        reply = ar_controller.simulate(steps_per_call,  {uav.px4_idx: px4_commands})
+    # Simulation loop, simulating for 20 seconds (simulation time, not physical time)
+    while (t < 10.0):
+        # Set px4 control input to do position tracking of a circle trajectory
+        # See actuator.md for details of input
         
-        # Step 1: Read IMU data (position, velocity, yaw) from the actual UAV
-        uav.update(reply, curr_sim_time)
+        if t > hovertime:
 
-        # Step 3: Get the current state of the UAV from the model
-        current_state = uav.output()
+            #px4_input = (3.0, 1.0, 0.0, 0.0, throttle) # This is the actuator input vector
+            #px4_input = (0.0, 0.0, 0.0, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            #px4_input = (0.0, nan, nan, nan, 0.0, 1.0, 0.0, nan, nan, nan, 1.570796326794897, nan) 
+            roll, pitch, yaw, thrust = nfc.set_xyz_force(*target_acc)
+            qw, qx, qy, qz = euler_angles_to_quaternion(roll, pitch, yaw)
+            throttle = thrust * nfc.TWR
+            print("throttle set:", throttle)
+            px4_input = (1.0, qw, qx, qy, qz, 0.0, throttle) # This is the actuator input vector
 
-        # Step 4: Compute control input using the LQR controller
-        control_input = lqr_controller.control_input(current_state)
 
-        #print("Control input:", control_input)
 
-        # Step 5: Pass control inputs to PX4 controller
-        ax, ay, az, yaw_rate = control_input
+        else:
+            px4_input = (0.0, 0.0, 0.0, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            #px4_input = (0.0, nan, nan, nan, 0.0, 1.0, 0.0, nan, nan, nan, 1.570796326794897, nan) 
 
-        px4_commands = (0.0, 
-                        nan,nan,nan,                    
-                        nan, nan, nan, 
-                        0.0,0.0, 0.0,
-                        0.0, 0.0)
+
+        # Simulate a control period, giving actuator input and retrieving sensor output
+        reply = controller.simulate(steps_per_call,  {px4_index: px4_input})
+        imu_data = reply.get_sensor_output(imu_index)
+        a_z = imu_data[14]
+        measured_a_zs.append(a_z)
+
+        r1_rps = reply.get_sensor_output(r1_joint_sensor_idx)[0]
+        r2_rps = reply.get_sensor_output(r2_joint_sensor_idx)[0]
+        r3_rps = reply.get_sensor_output(r3_joint_sensor_idx)[0]
+        r4_rps = reply.get_sensor_output(r4_joint_sensor_idx)[0]
+
+        avg_rps_list.append((np.abs(r1_rps) + np.abs(r2_rps) + np.abs(r3_rps) + np.abs(r4_rps))/4)
+
+        # Advance timer
+        t += steps_per_call * time_step
+
+
         
+        #print(f'x: {p_x:.2f}, y: {p_y:.2f}, z: {p_z:.2f}')
+        #if np.round(t,1) % .1 == 0.0:
 
-                        #0.01*ax, 0.01*ay, 0.01*az,
-        # Step 6: Optionally update the UAV model with the control input
-        #new_state = uav.state_update(control_input)
+        #print("Time", t)
+        #print("Avg rotor speed", avg_rps_list[-1])
+        #print("Predicted tot. Thrust with fitted function:", rps_to_thrust_p005_mrv80(avg_rps_list[-1]))
+        Ct =  0.000362
+        rho = 1.225
+        A = 0.11948
+        k = Ct * rho * A
+        d = 0.3
+        F = k * np.mean(np.abs(avg_rps_list[-1])**2)
 
-        # Debug or log the state and control inputs
-        print(f"Current state= {np.array(current_state)}, Control Input = {np.array(control_input)}, PX4 Commands = {np.array(px4_commands)}")
+        tau_x, tau_y, tau_z = compute_torques(r1_rps, r2_rps, r3_rps, r4_rps, k, d)
 
-        # advance timer and step counter:
-        curr_sim_time += steps_per_call * time_step
-        curr_step += steps_per_call
+        
+        
+        #print("####### Rotor speed:", np.mean(np.abs(avg_rps_list[-1])))
+        # Display the results
+        #print(f"Computed Total Thrust from constants: {4*F} N")
+        #print(f"Roll Torque (τx) {tau_x} Nm")
+        #print(f"Pitch Torque (τy): {tau_y} Nm")
+        #print(f"Yaw Torque (τz): {tau_z} Nm")
+        #print("------------")
+           # print("Roll torque imu:", )
 
 
+    # Clear simulator
+    print("Finished, clearing...")
+    controller.clear()
 
-run_simulation()
+    # Close the simulation controller
+    controller.close()
+    print("Done.")
+
+    print("max. recorded rps:", np.max(avg_rps_list))
+    print("min. recorded rps:", np.min(avg_rps_list))
+
+
+    thrusts = [rps_to_thrust_p005_mrv80(avg_rps) - 9.81*mass for avg_rps in avg_rps_list]
+    uav_z_forces = np.array(measured_a_zs)*mass
+
+    fig = plt.subplot()
+    fig.plot(moving_average(uav_z_forces, 20), label="UAV's z-axis forces")
+    fig.plot(thrusts, label="controller's \n rps forces")
+    plt.legend()
+    plt.show()
+
+    ignore_first_k = 200
+    data = uav_z_forces[ignore_first_k:]
+    # Parameters for the running average and variance
+    window_size = 20  # Adjust the window size as needed
+
+    # Compute running average and running variance
+    running_avg = np.convolve(data, np.ones(window_size) / window_size, mode='valid')
+    running_var = [np.var(data[i:i + window_size]) for i in range(len(data) - window_size + 1)]
+    running_std_dev = np.sqrt(running_var)
+    # compute total variance
+    total_var = np.full(len(running_avg),np.var(running_avg))
+    total_std = np.sqrt(total_var)
+    # Define the x-axis for the running metrics
+    x_vals = np.arange(window_size - 1, len(data))
+
+    # Plotting
+    plt.figure(figsize=(12, 6))
+    plt.plot(data, label="IMU Measurements", linewidth=0.4)
+
+    # Plot the variance tube (1 standard deviation above and below the running average)
+    plt.fill_between(x_vals, 
+                     running_avg - total_std, 
+                     running_avg + total_std, 
+                    color='orange', 
+                    alpha=0.4, 
+                    label="Variance (±1 STD)")
+    
+    plt.plot(x_vals, running_avg, color='orange', label="Running Average", linewidth=2)
+
+    # adjust length of input u to averaged measurements:
+    thrusts = thrusts[ignore_first_k:]
+    plt.plot(x_vals, thrusts[window_size-1:len(data)], label="controller's input thrust", linewidth=2, color="magenta")
+
+
+    # Labels and legend
+    plt.xlabel("Timesteps")
+    plt.ylabel("Value")
+    plt.title("Raw IMU measurement and its running average for smoother measurements")
+    plt.legend()
+    plt.show()
+
+    
+    
+controller = None
+try:
+    main(controller)
+except KeyboardInterrupt as Exp:
+    print("----------Error encountered:----------")
+    print(Exp)
+    print("--------------------")
+
+    if controller:
+        print("closing controller")
+        controller.clear()
+        controller.close()
+
+

@@ -4,30 +4,29 @@
 # Their implementation found at https://github.com/Li-Jinjie/ndp_nmpc_qd
 #----------------------------------
 import torch, sys
-import torch.nn as nn
-from torch.utils.data import DataLoader
 from model import DWPredictor
 from dataset import DWDataset
 import numpy as np
 from sklearn.model_selection import train_test_split
 
 import matplotlib.pyplot as plt
+sys.path.append('../../utils/')
+
 from utils import *
 
 sys.path.append('../../../../../notify/')
 from notify_script_end import notify_ending
 
-SAVE_MODEL = False
+SAVE_MODEL = True
 
-#load_model = r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-10-10-19-44-57-NDP-Li-Model-sn_scale-4-194k-datapoints-corrected-bias-salty-instructor40000_eps.pth"
 load_model = None
 
 seed = 123
-#torch.manual_seed(seed)
+torch.manual_seed(seed)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 2000
+n_epochs = 20000
 evaluate_at_l_epochs = 100
-save_at_m_epochs = 10000
+save_at_m_epochs = 20000
 
 lr = 1e-4
 #sn_gamma = 4 # scale factor for spectral normalization
@@ -91,14 +90,18 @@ def train():
     # list of tuples: ([px,py,pz, vx,vy,vz], [fx,fy,fz]) 
     # other vehicle - ego vehicle: [0,0,1]->[0,0,-6.5]
 
-    exp_name = init_experiment(f"NDP-predictor-sn_scale-{str(sn_gamma)}-300k-ts-flyby")
+    exp_name = init_experiment(f"NDP-sn-{str(sn_gamma)}-123")
 
-    dataset = DWDataset(
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\precise-data-collection\precise_200Hz_80_005_flyby_below_115136ts_labels.npz"
-        )
+    dataset = DWDataset([
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz"
+        ])
+    
+    
 
-
-    x_train, x_val, y_train, y_val = train_test_split(dataset.x, dataset.y, train_size=0.75, test_size=0.25,
+    x_train, x_val, y_train, y_val = train_test_split(dataset.x, dataset.y, train_size=0.8, test_size=0.2,
                                                       shuffle=True)
 
     
