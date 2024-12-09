@@ -10,13 +10,23 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class NonlinearFeedbackController:
     """Sets UAV via attitude controller to fly with certain force in each x,y,z-axis"""
-    def __init__(self, uav_mass=3.035, target_yaw=1.570796326794897):
+    def __init__(self, uav_mass=3.035, target_pos = (0,0,0,0,0,0,0), target_yaw=0.0):
         self.uav_mass = uav_mass
+        self.target_pos = target_pos
         self.target_yaw = target_yaw
-        self.g = -9.81
+        self.g = 9.81
         self.throttle_hover = 0.3347 # for 80.0, and 0.05 res
-        self.TWR = self.throttle_hover / (self.uav_mass * -self.g) # thrust to weight ratio
+        self.TWR = self.throttle_hover / (self.uav_mass * self.g) # thrust to weight ratio
         
+
+    def position_controller(self, ref):
+        """
+        Reads current error from reference position and returns target x,y,z forces
+        """
+        x_err = self.target_pos - ref[:3]
+        v_err = self.target_vel - ref[3:6]
+        yaw_err = self.target_yaw - ref[6]
+
 
     def set_xyz_force(self, x_force, y_force, z_force):
         """ Setting 0,0,0 means hovering"""
@@ -30,7 +40,7 @@ class NonlinearFeedbackController:
         
         
         roll = np.arctan((np.sin(pitch)*(y_acc*np.cos(self.target_yaw) - x_acc*np.sin(self.target_yaw)))
-                         / x_acc * np.cos(self.target_yaw) + y_acc * np.sin(self.target_yaw))
+                         / (x_acc * np.cos(self.target_yaw) + y_acc * np.sin(self.target_yaw)))
 
         thrust = self.uav_mass*np.sqrt(x_acc**2 + y_acc**2 + (z_acc + self.g)**2) # magnitude
         

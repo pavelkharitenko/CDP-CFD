@@ -16,9 +16,9 @@ load_model = None
 #seed = 123
 #torch.manual_seed(seed)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 20000
+n_epochs = 10000
 evaluate_at_l_epochs = 100
-save_at_m_epochs = 30000
+save_at_m_epochs = 20000
 
 lr = 1e-4
 #sn_gamma = 4 # scale factor for spectral normalization
@@ -76,7 +76,7 @@ def train():
     # list of tuples: ([px,py,pz, vx,vy,vz], [fx,fy,fz]) 
     # other vehicle - ego vehicle: [0,0,1]->[0,0,-6.5]
 
-    exp_name = init_experiment(f"Agile-Equiv-sn-{str(sn_gamma)}-123")
+    exp_name = init_experiment(f"Agile-Equiv-full-data-sn-{str(sn_gamma)}-123")
 
     dataset = AgileEquivariantDataset([
         r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz",
@@ -94,10 +94,10 @@ def train():
     
 
     # overfit on small subset first
-    x_train = x_train[0:-1:2]
-    x_val = x_val[0:-1:2]
-    y_train = y_train[0:-1:2]
-    y_val = y_val[0:-1:2]
+    x_train = x_train[0:-1:1]
+    x_val = x_val[0:-1:1]
+    y_train = y_train[0:-1:1]
+    y_val = y_val[0:-1:1]
 
     print("Length of dataset", len(x_train))
 

@@ -76,13 +76,15 @@ def train():
     # list of tuples: ([px,py,pz, vx,vy,vz], [fx,fy,fz]) 
     # other vehicle - ego vehicle: [0,0,1]->[0,0,-6.5]
 
-    exp_name = init_experiment(f"Agile-124-sn-{str(sn_gamma)}-123")
+    exp_name = init_experiment(f"Agile-124-sn-{str(sn_gamma)}-123S")
 
     dataset = AgileLeanDataset([
         r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz",
         r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz",
         r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz"
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_20_40\raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_20_40\raw_data_3_swapping_fast_200Hz_80_005_len56629ts_173_iterations.npz",
+
         ])
     
     

@@ -15,10 +15,12 @@ sys.path.append('../../utils/')
 from uav import *
 from utils import *
 
+#rot = 1.570796326794897
 
 nfc = NonlinearFeedbackController()
+#nfc.target_yaw = rot
 Fg = -9.81*3.035
-target_acc = [0.0,0.0, 10.0]
+target_acc = [0.0, 0.0, 0.1]
 
 
 def moving_average(data, window_size):
@@ -42,6 +44,10 @@ def main(controller):
     nan = float('NaN')
     mass = 3.035 # P600 weight
 
+    target_rot = 0.0
+
+    
+
     # Create simulation controller
     controller = simcontrol2.Controller('localhost', 25557)
 
@@ -55,7 +61,7 @@ def main(controller):
     r3_joint_sensor_idx = controller.get_sensor_info("uav_2_r3_joint_sensor").index
     r4_joint_sensor_idx = controller.get_sensor_info("uav_2_r4_joint_sensor").index
 
-    hovertime = 2.5
+    hovertime = 2.0
     throttle = 0.3347 # 0.3325 too low, 0.335 too high
 
     # Start simulation
@@ -78,22 +84,32 @@ def main(controller):
     while (t < 10.0):
         # Set px4 control input to do position tracking of a circle trajectory
         # See actuator.md for details of input
-        
+        print(t)
         if t > hovertime:
+
+            target_rot += 0.02
+
+            if t > 2.50 and t<2.7:
+                print("step------------------------------------")
+                target_acc[2] = 15.0
+            else:
+                target_acc[2] = 0.0
 
             #px4_input = (3.0, 1.0, 0.0, 0.0, throttle) # This is the actuator input vector
             #px4_input = (0.0, 0.0, 0.0, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
             #px4_input = (0.0, nan, nan, nan, 0.0, 1.0, 0.0, nan, nan, nan, 1.570796326794897, nan) 
+            nfc.target_yaw = target_rot * np.pi/180
             roll, pitch, yaw, thrust = nfc.set_xyz_force(*target_acc)
+            roll, pitch, yaw = np.array([roll, pitch, yaw]) * 180.0/np.pi
             qw, qx, qy, qz = euler_angles_to_quaternion(roll, pitch, yaw)
             throttle = thrust * nfc.TWR
-            print("throttle set:", throttle)
+            #print("throttle set:", throttle)
             px4_input = (1.0, qw, qx, qy, qz, 0.0, throttle) # This is the actuator input vector
 
 
 
         else:
-            px4_input = (0.0, 0.0, 0.0, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            px4_input = (0.0, 0.0, 0.0, 0.5, nan, nan, nan, nan, nan, nan, 0.0, nan) 
             #px4_input = (0.0, nan, nan, nan, 0.0, 1.0, 0.0, nan, nan, nan, 1.570796326794897, nan) 
 
 

@@ -71,7 +71,73 @@ class AgileEquivariantDataset(torch.utils.data.Dataset):
         self.y =  torch.tensor(y).to(torch.float32)
         self.N = len(self.x)
 
+class AgileVelDataset(torch.utils.data.Dataset):
+    def __init__(self, experiment_paths):
+        self.exp_paths = experiment_paths
+        self.extract_ndp_labels()
 
+    def __len__(self):
+        return self.N
+    
+    def __getitem__(self,index):
+        return self.x[index,:], self.y[index,:]
+        
+    def extract_ndp_labels(self):
+        x = np.empty((0,8))
+        y = np.array([])
+        for exp_path in self.exp_paths:
+            self.N = 0
+            
+            
+            data = np.load(exp_path)
+            uav_1_states, uav_2_states = data['uav_1_states'], data['uav_2_states']
+            #print(self.equivariant_lean_agile_transform(uav_1_states, uav_2_states).shape)
+            equiv_transform = equivariant_agile_transform(uav_1_states, uav_2_states)
+            x_i = equiv_transform[:,[0,1,8,9,10,11,12,13]]
+            y_i = data['dw_forces'][:,2]
+            x = np.vstack((x, x_i))
+            y = np.append(y,y_i)
+
+        print("extracted total X data of length:", len(x))
+        print("extracted total Y labels of length:", len(y))
+
+        self.x =  torch.tensor(x).to(torch.float32)
+        self.y =  torch.tensor(y).to(torch.float32)
+        self.N = len(self.x)
+
+
+class AgileContinousDataset(torch.utils.data.Dataset):
+    def __init__(self, experiment_paths):
+        self.exp_paths = experiment_paths
+        self.extract_ndp_labels()
+
+    def __len__(self):
+        return self.N
+    
+    def __getitem__(self,index):
+        return self.x[index,:], self.y[index,:]
+        
+    def extract_ndp_labels(self):
+        x = np.empty((0,14))
+        y = np.array([])
+        for exp_path in self.exp_paths:
+            self.N = 0
+            
+            
+            data = np.load(exp_path)
+            uav_1_states, uav_2_states = data['uav_1_states'], data['uav_2_states']
+            #print(self.equivariant_lean_agile_transform(uav_1_states, uav_2_states).shape)
+            x_i = continous_transform(equivariant_agile_transform(uav_1_states, uav_2_states))
+            y_i = data['dw_forces'][:,2]
+            x = np.vstack((x, x_i))
+            y = np.append(y,y_i)
+
+        print("extracted total X data of length:", len(x))
+        print("extracted total Y labels of length:", len(y))
+
+        self.x =  torch.tensor(x).to(torch.float32)
+        self.y =  torch.tensor(y).to(torch.float32)
+        self.N = len(self.x)
 
 def equivariant_agile_transform(u1_states, u2_states):
     """
@@ -86,6 +152,7 @@ def equivariant_agile_transform(u1_states, u2_states):
     v2_xy = u2_states[:,3:5]
     v2_z = u2_states[:,5]
 
+    v1_xy, _, v2_xy = process_vectors(v1_xy, dp_xy, v2_xy)
     angle_v1_dp_xy = compute_signed_angles(v1_xy, dp_xy)
     angle_v1_v2_xy = compute_signed_angles(v1_xy, v2_xy)
 
@@ -151,6 +218,41 @@ def equivariant_lean_agile_transform(u1_states, u2_states):
 
 
     return np.column_stack(result)
+
+
+
+def continous_transform(equivariant_states):
+    """
+    Input is columns of |dp_xy|, dp_z, angle_T1_dp, |T1_xy|, T1_z, ...
+    """
+    T1_decomp = angle_demcomposition(equivariant_states[:,2], equivariant_states[:,3])
+    T2_decomp = angle_demcomposition(equivariant_states[:,7], equivariant_states[:,5])
+    v1_decomp = angle_demcomposition(equivariant_states[:,8], equivariant_states[:,9])
+    v2_decomp = angle_demcomposition(equivariant_states[:,13], equivariant_states[:,11])
+
+    result = (
+        # z-axis components and dp length
+        equivariant_states[:, 0], # |p_xy|
+        equivariant_states[:, 1], # p_z
+        equivariant_states[:,4], # T1_z
+        equivariant_states[:,6], # T2_z
+        equivariant_states[:,10], # v1_z
+        equivariant_states[:,12], # v2_z
+        # new angle independant sinusoidal encodings
+        T1_decomp[:,0], T1_decomp[:,1],
+        T2_decomp[:,0], T2_decomp[:,1],
+        v1_decomp[:,0], v1_decomp[:,1],
+        v2_decomp[:,0], v2_decomp[:,1],
+    )
+
+    return np.column_stack(result)
+
+
+def angle_demcomposition(angles, amplitudes):
+    result = np.column_stack((amplitudes * np.sin(angles), amplitudes * np.cos(angles)))
+    return result
+
+
 
 
 def compute_thrust_vector(uav_states):

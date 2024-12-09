@@ -24,13 +24,13 @@ load_model = None
 seed = 123
 torch.manual_seed(seed)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 20000
-evaluate_at_l_epochs = 100
-save_at_m_epochs = 20000
+n_epochs = 30000
+evaluate_at_l_epochs = 200
+save_at_m_epochs = 10000
 
 lr = 1e-4
 #sn_gamma = 4 # scale factor for spectral normalization
-sn_gamma = 4
+sn_gamma = None
  
 def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimizer, loss_fn):
 
@@ -90,13 +90,15 @@ def train():
     # list of tuples: ([px,py,pz, vx,vy,vz], [fx,fy,fz]) 
     # other vehicle - ego vehicle: [0,0,1]->[0,0,-6.5]
 
-    exp_name = init_experiment(f"NDP-sn-{str(sn_gamma)}-123")
+    exp_name = init_experiment(f"NDP-sn-{str(sn_gamma)}-123S")
 
     dataset = DWDataset([
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz"
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\speeds_05_20\raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\speeds_05_20\raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\speeds_05_20\raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_05_20\raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_20_40\raw_data_3_swapping_fast_200Hz_80_005_len56629ts_173_iterations.npz",
+
         ])
     
     
@@ -107,10 +109,10 @@ def train():
     
 
     # overfit on small subset first
-    #x_train = x_train[:20]
-    #x_val = x_val[:20]
-    #y_train = y_train[:20]
-    #y_val = y_val[:20]
+    x_train = x_train[0:-1:1]
+    x_val = x_val[0:-1:1]
+    y_train = y_train[0:-1:1]
+    y_val = y_val[0:-1:1]
 
 
     # init or load model, optimizer and loss 

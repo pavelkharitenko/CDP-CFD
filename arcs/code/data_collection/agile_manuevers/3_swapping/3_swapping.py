@@ -21,7 +21,7 @@ def main(controller):
 
     # exp specific
     SAVE_EXP = True
-    SIM_MAX_DURATION = 8.0
+    SIM_MAX_DURATION = 800.0
 
     SAVE_INTERVALL = 6.0
     # episode specific
@@ -60,9 +60,9 @@ def main(controller):
     yaw_uav_2 = 1.570796
 
     # sample initial z-position for uav 2
-    y_vel_max = 2.0
-    y_vel_min = 0.5
-    y_pos_max = -1.5
+    y_vel_max = 4.0
+    y_vel_min = 2.0
+    y_pos_max = -2.0
     initial_point = sample_3d_point(-1.0) # returns at negative side a point p=[N(), N(), N()]
     sampled_y_vel = -1.0*sample_from_range(y_vel_min,y_vel_max)
     initial_y_pos = 1.5 + sampled_y_vel*0.2

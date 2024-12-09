@@ -84,7 +84,93 @@ class AgileEquivariantPredictor(nn.Module):
 
             return np.column_stack((np.zeros((len(force_list), 2)), force_list))
 
+        
+class AgileContinousPredictor(nn.Module):
+    def __init__(self, input_dim=14, hidden_dim=128, output_dim=1):
+        """
+        just learn with (dx, abs(v1), abs(v2), T1, T2) (R^11)
 
+        for geometric equivariance: 
+        input is
+        |proj_xy(T1)|, |proj_xy(T2)|, proj_z(T1), proj_z(T2), angle(proj_xy(T1),proj_xy(T2)), 
+        |proj_xy(dp)|, angle(proj_xy(T1), proj_xy(dp))
+
+        after transformation, R^9
+
+        output: [f_z, torque_roll, torque_pitch]
+        """
+        super(AgileContinousPredictor, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),  
+            nn.ReLU(),                         
+            nn.Linear(hidden_dim, 64), 
+            nn.ReLU(),                         
+            nn.Linear(64, hidden_dim),
+            nn.ReLU(),                         
+            nn.Linear(hidden_dim, output_dim)  
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+
+    def evaluate(self, uav_1_state, uav_2_state):
+        """
+        From R:6 (rel_pos, rel_vel) to R:3 (dw_x, dw_y, dw_z) 
+        """
+
+        with torch.no_grad():
+            equiv_transform = continous_transform(equivariant_agile_transform(uav_1_state, uav_2_state))
+            inputs = torch.tensor(equiv_transform).to(torch.float32)
+            dw_forces = self.forward(inputs)
+            force_list = dw_forces.detach().cpu().numpy()
+
+            return np.column_stack((np.zeros((len(force_list), 2)), force_list))
+
+
+
+class AgileVelPredictor(nn.Module):
+    def __init__(self, input_dim=8, hidden_dim=128, output_dim=1):
+        """
+        just learn with (dx, abs(v1), abs(v2), T1, T2) (R^11)
+
+        for geometric equivariance: 
+        input is
+        |proj_xy(T1)|, |proj_xy(T2)|, proj_z(T1), proj_z(T2), angle(proj_xy(T1),proj_xy(T2)), 
+        |proj_xy(dp)|, angle(proj_xy(T1), proj_xy(dp))
+
+        after transformation, R^9
+
+        output: [f_z, torque_roll, torque_pitch]
+        """
+        super(AgileVelPredictor, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),  
+            nn.ReLU(),                         
+            nn.Linear(hidden_dim, 64), 
+            nn.ReLU(),                         
+            nn.Linear(64, hidden_dim),
+            nn.ReLU(),                         
+            nn.Linear(hidden_dim, output_dim)  
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+
+    def evaluate(self, uav_1_state, uav_2_state):
+        """
+        From R:6 (rel_pos, rel_vel) to R:3 (dw_x, dw_y, dw_z) 
+        """
+
+        with torch.no_grad():
+            equiv_transform = equivariant_agile_transform(uav_1_state, uav_2_state)
+            vel_pred = equiv_transform[:,[0,1,8,9,10,11,12,13]]
+            inputs = torch.tensor(vel_pred).to(torch.float32)
+            dw_forces = self.forward(inputs)
+            force_list = dw_forces.detach().cpu().numpy()
+
+            return np.column_stack((np.zeros((len(force_list), 2)), force_list))
 
 class AgileLeanPredictor(nn.Module):
     def __init__(self, input_dim=10, hidden_dim=128, output_dim=1):
@@ -129,6 +215,7 @@ class AgileLeanPredictor(nn.Module):
             return np.column_stack((np.zeros((len(force_list), 2)), force_list))
 
 
+# helper functions
 
 def equivariant_agile_transform(u1_states, u2_states):
     """
@@ -143,6 +230,9 @@ def equivariant_agile_transform(u1_states, u2_states):
     v2_xy = u2_states[:,3:5]
     v2_z = u2_states[:,5]
 
+
+    v1_xy, _, v2_xy = process_vectors(v1_xy, dp_xy, v2_xy)
+
     angle_v1_dp_xy = compute_signed_angles(v1_xy, dp_xy)
     angle_v1_v2_xy = compute_signed_angles(v1_xy, v2_xy)
 
@@ -151,6 +241,7 @@ def equivariant_agile_transform(u1_states, u2_states):
     # compute T1 thrust vectors and their orientations and translations 
     T1 = compute_thrust_vector(u1_states)
     T1_xy = T1[:,:2]
+    print("T1xy", T1_xy)
     T1_z = T1[:,2]
     
     T2 = compute_thrust_vector(u2_states)
@@ -159,20 +250,58 @@ def equivariant_agile_transform(u1_states, u2_states):
 
     # symmetry assumptions: flip T1 to left side of dp, and flip T2 accordingly to T2
     T1_xy, dp_xy, T2_xy = process_vectors(T1_xy, dp_xy, T2_xy)
+    print("T1xy", T1_xy)
 
     angle_T1_T2_xy = compute_signed_angles(T1_xy, T2_xy)
     angle_T1_dp_xy = compute_signed_angles(T1_xy, dp_xy)
 
-    result = (np.linalg.norm(dp_xy, axis=1), dp_z, 
-                angle_T1_dp_xy, 
-                np.linalg.norm(T1_xy, axis=1), T1_z, 
-                np.linalg.norm(T2_xy, axis=1), T2_z, angle_T1_T2_xy, 
-                angle_v1_dp_xy, 
-                np.linalg.norm(v1_xy, axis=1), v1_z, 
-                np.linalg.norm(v2_xy, axis=1), v2_z, angle_v1_v2_xy)
+    result = (
+        np.linalg.norm(dp_xy, axis=1), dp_z, # 0 1
+        angle_T1_dp_xy, # 2
+        np.linalg.norm(T1_xy, axis=1), T1_z, # 3 4
+        np.linalg.norm(T2_xy, axis=1), T2_z, # 5 6
+        angle_T1_T2_xy, # 7
+        angle_v1_dp_xy, # 8
+        np.linalg.norm(v1_xy, axis=1), v1_z, # 9 10
+        np.linalg.norm(v2_xy, axis=1), v2_z, angle_v1_v2_xy # 11 12 13
+    ) 
 
 
     return np.column_stack(result)
+
+def continous_transform(equivariant_states):
+    """
+    Input is columns of |dp_xy|, dp_z, angle_T1_dp, |T1_xy|, T1_z, ...
+    """
+    T1_decomp = angle_demcomposition(equivariant_states[:,2], equivariant_states[:,3])
+    T2_decomp = angle_demcomposition(equivariant_states[:,7], equivariant_states[:,5])
+    v1_decomp = angle_demcomposition(equivariant_states[:,8], equivariant_states[:,9])
+    v2_decomp = angle_demcomposition(equivariant_states[:,13], equivariant_states[:,11])
+
+    result = (
+        # z-axis components and dp length
+        equivariant_states[:, 0], # |p_xy|
+        equivariant_states[:, 1], # p_z
+        equivariant_states[:,4], # T1_z
+        equivariant_states[:,6], # T2_z
+        equivariant_states[:,10], # v1_z
+        equivariant_states[:,12], # v2_z
+        # new angle independant sinusoidal encodings
+        T1_decomp[:,0], T1_decomp[:,1],
+        T2_decomp[:,0], T2_decomp[:,1],
+        v1_decomp[:,0], v1_decomp[:,1],
+        v2_decomp[:,0], v2_decomp[:,1],
+    )
+
+    return np.column_stack(result)
+
+
+
+
+
+def angle_demcomposition(angles, amplitudes):
+    result = np.column_stack((amplitudes * np.sin(angles), amplitudes * np.cos(angles)))
+    return result
 
 
 
@@ -217,9 +346,11 @@ def compute_thrust_vector(uav_states):
         Returns list of Thrust vectors [x,y,z] rotated accordingly to uav's orientation
         """
         thrusts = rps_to_thrust_p005_mrv80(np.mean(uav_states[:,22:26], axis=1, keepdims=True))
-        print(thrusts[:5])
+        #print(thrusts[:5])
         thrust_vectors = np.column_stack((np.zeros(len(thrusts)), np.zeros(len(thrusts)), thrusts))
         rotations = R.from_euler('zyx', uav_states[:,9:12])
+        # TODO: pitch angle is negative, but rotation is positive (right hand convention)
+
         thrust_list = rotations.apply(thrust_vectors) 
 
         return thrust_list
@@ -283,3 +414,36 @@ def compute_signed_angles(v1_list, v2_list):
 
 
 
+# angles = np.array([0.0, 
+#                    np.pi, 
+#                    np.pi*2.0,
+#                    np.pi/2.0])  # shape (n,)
+# amplitudes = np.array([1.0, 
+#                        2.0, 
+#                        3.0,
+#                        4.0])  # shape (n,)
+
+# #print(np.round(angle_demcomposition(angles, amplitudes),3)[:,1])
+
+# u1_state = np.array([[0.0,1.0,1.0, 0.0,1.0,1.0, 0.0,0.0,0.0, # pos vel acc       
+#                      0.0, 0.0, np.pi/2.0, 0.0,0.0,0.0, 0.0,0.0,0.0, # r, w, w_dot
+#                      0.0,0.0,0.0,0.0, # quaternion
+#                      410.0,410.0,410.0,410.0 # rotor rps
+#                      ]])
+
+# u2_state = np.array([[0.0,0.0,0.0, 1.0,0.0,0.0, 0.0,0.0,0.0, # pos vel acc            
+#                      0.0,0.0,0.0, 0.0,0.0,0.0, 0.0,0.0,0.0, # r, w, w_dot
+#                      0.0,0.0,0.0,0.0, # quaternion
+#                      350.0,350.0,350.0,350.0 # rotor rps
+#                      ]])
+# print(
+#     #continous_transform(
+#     equivariant_agile_transform(u1_state, u2_state)
+#     #)
+#     )
+
+# print(
+#     continous_transform(
+#     equivariant_agile_transform(u1_state, u2_state)
+#     )
+#     )

@@ -1205,12 +1205,12 @@ def euler_angles_to_quaternion(roll, pitch, yaw):
     sr = math.sin(roll * 0.5)
 
     # Calculate quaternion
-    qw = cr * cp * cy + sr * sp * sy
-    qx = sr * cp * cy - cr * sp * sy
-    qy = cr * sp * cy + sr * cp * sy
-    qz = cr * cp * sy - sr * sp * cy
+    w = cr * cp * cy + sr * sp * sy
+    x = sr * cp * cy - cr * sp * sy
+    y = cr * sp * cy + sr * cp * sy
+    z = cr * cp * sy - sr * sp * cy
 
-    return qw, qx, qy, qz
+    return w, x, y, z
 
 
 
@@ -1405,7 +1405,7 @@ def extract_and_plot_data(data_set_paths=None,
         uav_2_states = []
         time_seq = []
 
-        for path in dataset_paths:
+        for path in data_set_paths:
             exp = load_forces_from_dataset(path)
             uav_1, uav_2 = exp['uav_list']
             uav_1_states.extend(uav_1.states[0:])
@@ -1441,60 +1441,60 @@ def extract_and_plot_data(data_set_paths=None,
 
     
     model_paths = [
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-11-20-13-11-05-NDP-predictor-sn_scale-4-300k-ts-flyby-navy-sill20000_eps.pth",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\SO2\2024-11-20-00-10-30-SO2-Model-below-sn_scale-None-gray-javelin20000_eps.pth",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\SO2\2024-11-20-12-30-17-SO2-Model-below-sn_scale-4-dull-flow20000_eps.pth",
+        #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-11-20-13-11-05-NDP-predictor-sn_scale-4-300k-ts-flyby-navy-sill20000_eps.pth",
+        #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\SO2\2024-11-20-00-10-30-SO2-Model-below-sn_scale-None-gray-javelin20000_eps.pth",
+        #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\SO2\2024-11-20-12-30-17-SO2-Model-below-sn_scale-4-dull-flow20000_eps.pth",
     ]
     models = []
 
-    colors= ["green", "yellow", "red"]
+    # colors= ["green", "yellow", "red"]
 
-    model = DWPredictor()
-    model.load_state_dict(torch.load(model_paths[0], weights_only=True))
-    models.append(model)
+    # model = DWPredictor()
+    # model.load_state_dict(torch.load(model_paths[0], weights_only=True))
+    # models.append(model)
 
-    model = ShallowEquivariantPredictor()
-    model.load_state_dict(torch.load(model_paths[1], weights_only=True))
-    models.append(model)
+    # model = ShallowEquivariantPredictor()
+    # model.load_state_dict(torch.load(model_paths[1], weights_only=True))
+    # models.append(model)
 
-    model = ShallowEquivariantPredictor()
-    model.load_state_dict(torch.load(model_paths[2], weights_only=True))
-    models.append(model)
-
-
-    predictions = evaluate_zy_force_curvature(models, np.array(rel_state_vector_list)[:,:6])
-    labels = [ 
-        "NDP new data SN<4 ", 
-        "SO2-Equiv.", 
-        "SO2-Equiv. SN<4", 
-    ]
+    # model = ShallowEquivariantPredictor()
+    # model.load_state_dict(torch.load(model_paths[2], weights_only=True))
+    # models.append(model)
 
 
+    # predictions = evaluate_zy_force_curvature(models, np.array(rel_state_vector_list)[:,:6])
+    # labels = [ 
+    #     "NDP new data SN<4 ", 
+    #     "SO2-Equiv.", 
+    #     "SO2-Equiv. SN<4", 
+    # ]
 
-    # 3 plot if needed
-    if plot:
-        fig = plt.subplot()
-        #fig.plot(u2_z_forces, label="UAV's z-axis forces") # unsmoothed
-        plot_array_with_segments(fig, time_seq, smoothed_u2_z_forces, color="blue", roll=roll_iterations, label="UAV total Z-forces")
-        plot_array_with_segments(fig, time_seq, u2_thrusts,  color="orange", roll=roll_iterations, label="controller z-forces")
-        plot_array_with_segments(fig, time_seq, u2_z_dw_forces, color="magenta", roll=roll_iterations, label="downwash disturbance forces", overlaps=overlaps)
+
+
+    # # 3 plot if needed
+    # if plot:
+    #     fig = plt.subplot()
+    #     #fig.plot(u2_z_forces, label="UAV's z-axis forces") # unsmoothed
+    #     plot_array_with_segments(fig, time_seq, smoothed_u2_z_forces, color="blue", roll=roll_iterations, label="UAV total Z-forces")
+    #     plot_array_with_segments(fig, time_seq, u2_thrusts,  color="orange", roll=roll_iterations, label="controller z-forces")
+    #     plot_array_with_segments(fig, time_seq, u2_z_dw_forces, color="magenta", roll=roll_iterations, label="downwash disturbance forces", overlaps=overlaps)
         
-        # evaluate predictors
-        for idx, prediction in enumerate(predictions):
-            plot_array_with_segments(fig, time_seq, prediction[:,2], roll=roll_iterations, color=colors[idx], label=labels[idx])
-            compute_rmse(prediction[:,2][overlap_indices], u2_z_dw_forces[overlap_indices],label=labels[idx])
+    #     # evaluate predictors
+    #     for idx, prediction in enumerate(predictions):
+    #         plot_array_with_segments(fig, time_seq, prediction[:,2], roll=roll_iterations, color=colors[idx], label=labels[idx])
+    #         compute_rmse(prediction[:,2][overlap_indices], u2_z_dw_forces[overlap_indices],label=labels[idx])
             
         
         
 
 
 
-        plt.ylabel("Force [N]")
-        plt.xlabel("time [s]")
-        plt.grid()
-        plt.title("Actual bottom UAV Z-forces, controller's thrust, and residual downwash force")
-        plt.legend()
-        plt.show()
+    #     plt.ylabel("Force [N]")
+    #     plt.xlabel("time [s]")
+    #     plt.grid()
+    #     plt.title("Actual bottom UAV Z-forces, controller's thrust, and residual downwash force")
+    #     plt.legend()
+    #     plt.show()
 
 
 
@@ -1508,7 +1508,7 @@ def extract_and_plot_data(data_set_paths=None,
     reset_indices = np.append(reset_indices, len(time_seq))  # Include the end of the array as the last boundary
     n_itrs = len(reset_indices)
     if save:
-        np.savez(f"raw_data_3_swapping_200Hz_80_005_len{len(uav_1_states)}ts_{n_itrs}_iterations", 
+        np.savez(f"raw_data_3_swapping_fast_200Hz_80_005_len{len(uav_1_states)}ts_{n_itrs}_iterations", 
                  uav_1_states=uav_1_states, 
                  uav_2_states=uav_2_states, 
                  dw_forces=u2_z_dw_forces)
@@ -1559,6 +1559,7 @@ def plot_array_with_segments(fig, time, array, roll=True, color=None, label=None
 
 def compute_rmse(array1, array2, label=None):
     rmse = np.sqrt(np.mean((array1 - array2) ** 2))
+    print("length of comparison", len(array1))
     if label:
         print(f"RMSE of {label} is: {rmse}")
     else:

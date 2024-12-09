@@ -8,6 +8,12 @@
   rigid_bodies:
     skeletons:
       - file_path: "p600.urdf"
+        initial_rotation:
+            angle_radians: 0.0
+            axis:
+            - 0.0
+            - 0.0
+            - 1.0
         joint_velocities:
           p600__rotor_0_joint:
             - 350.0
