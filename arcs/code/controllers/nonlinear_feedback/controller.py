@@ -10,22 +10,59 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class NonlinearFeedbackController:
     """Sets UAV via attitude controller to fly with certain force in each x,y,z-axis"""
-    def __init__(self, uav_mass=3.035, target_pos = (0,0,0,0,0,0,0), target_yaw=0.0):
+    def __init__(self, uav_mass=3.035, target_yaw=0.0, dt=0.005):
+        self.dt = dt
         self.uav_mass = uav_mass
-        self.target_pos = target_pos
+
         self.target_yaw = target_yaw
         self.g = 9.81
         self.throttle_hover = 0.3347 # for 80.0, and 0.05 res
         self.TWR = self.throttle_hover / (self.uav_mass * self.g) # thrust to weight ratio
+
+        self.s_int = 0.0
+
+        #self.M = np.eye(3) * self.uav_mass
+        self.G = self.uav_mass * np.array([0, 0, self.g])
+
+        self.Kp = 0.5
+        self.Ki = 0.0
+        self.Lambda = 3.0
+
+        self.pos = np.zeros(3)
+        self.vel = np.zeros(3)
+        self.acc = np.zeros(3)
+
+
+    
+    def feedback(self, pos, vel, acc):
+        self.pos = pos
+        self.vel = vel
+        self.acc = acc
         
 
-    def position_controller(self, ref):
+    def position_controller(self, desired):
         """
-        Reads current error from reference position and returns target x,y,z forces
+        Reads current error from reference position and returns target x,y,z forces.
+        From: "Neural-Fly Enables Rapid Learning for Agile Flight in Strong Winds" O'Connell et al.
+        u = Mq *q_dot_dot + g  - K*s - K_i*Int(s)
+
+        desired: R^9 vector of p_des, v_des, a_des
         """
-        x_err = self.target_pos - ref[:3]
-        v_err = self.target_vel - ref[3:6]
-        yaw_err = self.target_yaw - ref[6]
+        x_err = self.pos - desired[:3] # p_tilde
+        v_err = self.vel - desired[3:6] # p_dot_tilde
+        s = v_err - self.Lambda * x_err
+        
+        self.s_int = s * self.dt + self.s_int
+        
+        #yaw_err = self.target_yaw - ref[6]
+
+        acc_ref = desired[6:9] - self.Lambda * v_err # see NeuralLander for this term
+        
+        self.G = 0
+        u = self.uav_mass * acc_ref + self.G - self.Kp * s - self.Ki * self.s_int
+        f_xyz = u
+
+        return f_xyz
 
 
     def set_xyz_force(self, x_force, y_force, z_force):
@@ -45,6 +82,17 @@ class NonlinearFeedbackController:
         thrust = self.uav_mass*np.sqrt(x_acc**2 + y_acc**2 + (z_acc + self.g)**2) # magnitude
         
         return roll, pitch, self.target_yaw, thrust
+    
+    def nonlinear_feedback(self, desired):
+        f_xyz = self.position_controller(desired)
+
+        print("F_xyz from position controller:", f_xyz)
+
+        
+        return self.set_xyz_force(*f_xyz)
+        #return self.set_xyz_force(.0,.0,.0)
+
+        
 
     def align_vector(self, target_vector, thrust_vector):
         """

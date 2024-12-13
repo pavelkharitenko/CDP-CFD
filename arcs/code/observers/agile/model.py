@@ -7,6 +7,44 @@ from utils import *
 # input format: x = [pos_rel, vel_rel] (relative state vector)
 # output format: y = f_dw_pred xyz-force of downwash
 
+    
+class AgileShallowPredictor(nn.Module):
+    def __init__(self, input_dim=14, hidden_dim=64, output_dim=1):
+        """
+        for geometric equivariance input is
+        |proj_xy(T1)|, |proj_xy(T2)|, proj_z(T1), proj_z(T2), angle(proj_xy(T1),proj_xy(T2)), 
+        |proj_xy(dp)|, angle(proj_xy(T1), proj_xy(dp))
+
+        after transformation, R^9
+
+        output: [f_z]
+        """
+        super(AgileShallowPredictor, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),  
+            nn.ReLU(),                         
+            nn.Linear(hidden_dim, output_dim), 
+        )
+
+    def forward(self, x):
+        return self.model(x)
+
+
+    def evaluate(self, uav_1_state, uav_2_state):
+        """
+        From R:6 (rel_pos, rel_vel) to R:3 (dw_x, dw_y, dw_z) 
+        """
+
+        with torch.no_grad():
+            equiv_transform = continous_transform(equivariant_agile_transform(uav_1_state, uav_2_state))
+            inputs = torch.tensor(equiv_transform).to(torch.float32)
+            dw_forces = self.forward(inputs)
+            force_list = dw_forces.detach().cpu().numpy()
+
+            return np.column_stack((np.zeros((len(force_list), 2)), force_list))
+
+
+
 
 class AgilePredictor(nn.Module):
     def __init__(self, input_dim=12, hidden_dim=128, output_dim=4):

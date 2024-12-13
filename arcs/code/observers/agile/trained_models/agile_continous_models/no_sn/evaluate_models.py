@@ -10,17 +10,19 @@ sys.path.append('../../observers/')
 from neuralswarm.model import NeuralSwarmPredictor
 from ndp.model import DWPredictor
 from SO2.model import ShallowEquivariantPredictor
-from agile.model import AgileLeanPredictor, AgileEquivariantPredictor, AgileVelPredictor, AgileContinousPredictor
+from agile.model import AgileContinousPredictor, AgileShallowPredictor
+from NNARX.model import NNARXModel
 #from model import DWPredictor
 
 
 roll_iterations = False
 
 dataset_paths = [
-        #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\speeds_05_20\raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz",
-        #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\speeds_05_20\raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz",
-        #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_05_20\raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\speeds_05_20\raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz",
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\speeds_05_20\raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz", 
+        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_05_20\raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz",
         r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_20_40\raw_data_3_swapping_fast_200Hz_80_005_len20802ts_67_iterations_testset.npz",
+        
 ]
 
 dataset_titles = [
@@ -58,7 +60,7 @@ u2_avg_rps = np.mean(np.abs(np.array(uav_2_states)[:,22:26]), axis=1)
 u2_rps_rot = zip(u2_avg_rps, u2_rotations)
 
 
-overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 10.1)[0]
+overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 10.5)[0]
 overlaps = np.array(time_seq)[overlap_indices]
 
 # 2 compute uav actual forces, smooth them, and compute controller z-axis forces, and their residual disturbance
@@ -70,28 +72,46 @@ u2_z_dw_forces = smoothed_u2_z_forces - u2_thrusts
 
 
 model_paths = [
-r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-12-09-23-07-36-NSwarm-sn-None-123S-tall-hearth10000_eps.pth",
-r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-12-09-23-07-36-NSwarm-sn-None-123S-tall-hearth20000_eps.pth",
-r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-12-09-23-07-36-NSwarm-sn-None-123S-tall-hearth50000_eps.pth",
-]
+#r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-12-09-23-07-36-NSwarm-sn-None-123S-tall-hearth10000_eps.pth",
+#r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-12-09-23-07-36-NSwarm-sn-None-123S-tall-hearth20000_eps.pth",
+#r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-12-09-23-07-36-NSwarm-sn-None-123S-tall-hearth50000_eps.pth",
+r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\agile\trained_models\agile_continous_models\123S\2024-12-09-15-49-54-Agile-Cont-full-data-sn-None-123S-broad-ramp10000_eps.pth",
+# NNARX
+#r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\NNARX\2024-12-10-16-19-51-NNARX-lags-1-123S-factorial-radiator20_eps.pth",
+#r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\NNARX\2024-12-10-16-37-41-NNARX-lags-5-123S-chamfered-artifact20_eps.pth",
+#r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\NNARX\2024-12-10-16-43-39-NNARX-lags-10-123S-modern-buyer20_eps.pth",
+r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\NNARX\2024-12-10-16-47-28-NNARX-lags-15-123S-warped-vocoder20_eps.pth",
+r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\agile\2024-12-11-19-55-09-Agile-Shllw-full-data-sn-None-123S-future-country30000_eps.pth",
+r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\agile\2024-12-11-19-55-09-Agile-Shllw-full-data-sn-None-123S-future-country20000_eps.pth",
+r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\agile\2024-12-11-19-55-09-Agile-Shllw-full-data-sn-None-123S-future-country10000_eps.pth"]
 models = []
 
 colors= ["green", "purple", "grey", "red", "cyan", "pink", "black"]
 
 
+# model = NeuralSwarmPredictor()
+# model.load_state_dict(torch.load(model_paths[0], weights_only=True))
+# models.append(model)
 
-model = NeuralSwarmPredictor()
-model.load_state_dict(torch.load(model_paths[0], weights_only=True))
-models.append(model)
+# model = NeuralSwarmPredictor()
+# model.load_state_dict(torch.load(model_paths[1], weights_only=True))
+# models.append(model)
 
-model = NeuralSwarmPredictor()
-model.load_state_dict(torch.load(model_paths[1], weights_only=True))
-models.append(model)
 
-model = NeuralSwarmPredictor()
-model.load_state_dict(torch.load(model_paths[2], weights_only=True))
-models.append(model)
+model_al1 = AgileContinousPredictor()
+model_al1.load_state_dict(torch.load(model_paths[0], weights_only=True))
 
+model_al2 = NNARXModel(input_dim=210)
+model_al2.load_state_dict(torch.load(model_paths[1], weights_only=True))
+
+model_al3 = AgileShallowPredictor()
+model_al3.load_state_dict(torch.load(model_paths[2], weights_only=True))
+
+model_al4 = AgileShallowPredictor()
+model_al4.load_state_dict(torch.load(model_paths[3], weights_only=True))
+
+model_al5 = AgileShallowPredictor()
+model_al5.load_state_dict(torch.load(model_paths[4], weights_only=True))
 
 #model = ShallowEquivariantPredictor()
 #model.load_state_dict(torch.load(model_paths[1], weights_only=True))
@@ -113,34 +133,47 @@ models.append(model)
 
 
 predictions = evaluate_zy_force_curvature(models, np.array(rel_state_vector_list)[:,:6])
-#predictions.append(model_al1.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
-#predictions.append(model_al2.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
-#predictions.append(model_al3.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
-#predictions.append(model_al3.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
+predictions.append(model_al1.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
+predictions.append(model_al2.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
+predictions.append(model_al3.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
+predictions.append(model_al4.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
+predictions.append(model_al5.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
+
 
 
 
 
 labels = [ 
-"NeuralS 10k full data",
-"NeuralS 20k full data",
-"NeuralS 50k full data",
+"Agile 20k full data",
+"NNARX 15",
+"shllw 10",
+"shllw 20",
+"Shllw 30",
 ]
+
+
 
 
 fig = plt.subplot()
 #fig.plot(u2_z_forces, label="UAV's z-axis forces") # unsmoothed
 #plot_array_with_segments(fig, time_seq, smoothed_u2_z_forces, color="blue", roll=roll_iterations, label="UAV total Z-forces")
 #plot_array_with_segments(fig, time_seq, u2_thrusts,  color="orange", roll=roll_iterations, label="controller z-forces")
-plot_array_with_segments(fig, np.array(time_seq)[overlap_indices], u2_z_dw_forces[overlap_indices], color="magenta", roll=roll_iterations, label="downwash disturbance forces", overlaps=overlaps)
+plot_array_with_segments(fig, np.array(time_seq)[overlaps], u2_z_dw_forces[overlaps], color="magenta", roll=roll_iterations, label="downwash disturbance forces", overlaps=overlaps)
 
 # evaluate predictors
 for idx, prediction in enumerate(predictions):
     #scenario_title = dataset_titles[idx]
-    plot_array_with_segments(fig, np.array(time_seq)[overlap_indices], prediction[:,2][overlap_indices], roll=roll_iterations, color=colors[idx], label=labels[idx])
-    compute_rmse(prediction[:,2][overlap_indices], u2_z_dw_forces[overlap_indices],label=labels[idx])
-    print(f"R2 score of {labels[idx]}", r2_score(u2_z_dw_forces[overlap_indices],prediction[:,2][overlap_indices]))
-    #compute_rmse(prediction[:,2], u2_z_dw_forces,label=labels[idx])
+    print("Now:", labels[idx])
+
+    
+
+
+    
+    plot_array_with_segments(fig, np.array(time_seq)[overlaps], prediction[:,2][overlaps], roll=roll_iterations, color=colors[idx], label=labels[idx])
+    compute_rmse(prediction[:,2][overlaps], u2_z_dw_forces[overlaps],label=labels[idx])
+    print(f"R2 score of {labels[idx]}", r2_score(u2_z_dw_forces[overlaps],prediction[:,2][overlaps]))
+
+
 
     
 

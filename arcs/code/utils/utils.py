@@ -23,6 +23,8 @@ sys.path.append('../../../observers/')
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+
+
 def plot_xy_slices(model):
     """
     Visualize (x,y,z) output of NN as 2D heatmap. Based on "plot_historgrams" at
