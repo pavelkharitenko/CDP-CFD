@@ -279,7 +279,7 @@ def equivariant_agile_transform(u1_states, u2_states):
     # compute T1 thrust vectors and their orientations and translations 
     T1 = compute_thrust_vector(u1_states)
     T1_xy = T1[:,:2]
-    print("T1xy", T1_xy)
+    #print("T1xy", T1_xy)
     T1_z = T1[:,2]
     
     T2 = compute_thrust_vector(u2_states)
@@ -288,7 +288,7 @@ def equivariant_agile_transform(u1_states, u2_states):
 
     # symmetry assumptions: flip T1 to left side of dp, and flip T2 accordingly to T2
     T1_xy, dp_xy, T2_xy = process_vectors(T1_xy, dp_xy, T2_xy)
-    print("T1xy", T1_xy)
+    #print("T1xy", T1_xy)
 
     angle_T1_T2_xy = compute_signed_angles(T1_xy, T2_xy)
     angle_T1_dp_xy = compute_signed_angles(T1_xy, dp_xy)

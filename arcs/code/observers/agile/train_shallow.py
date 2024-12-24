@@ -7,8 +7,8 @@ sys.path.append('../../utils/')
 
 from utils import *
 
-sys.path.append('../../../../../notify/')
-from notify_script_end import notify_ending
+#sys.path.append('../../../../../notify/')
+#from notify_script_end import notify_ending
 
 SAVE_MODEL = True
 load_model = None
@@ -26,7 +26,7 @@ lr = 1e-4
 sn_gamma = None
 
 
-model_name = f"Agile-Shllw-full-data-sn-{str(sn_gamma)}-123S"
+model_name = f"Agile-Shallow-full-data-sn-{str(sn_gamma)}-123S"
  
 def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimizer, loss_fn):
 
@@ -83,11 +83,11 @@ def train():
     exp_name = init_experiment(model_name)
 
     dataset = AgileContinousDataset([
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\speeds_05_20\raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\speeds_05_20\raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\speeds_05_20\raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_05_20\raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_20_40\raw_data_3_swapping_fast_200Hz_80_005_len56629ts_173_iterations.npz",
+        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz"),
+        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz"),
+        find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz"),
+        find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len56629ts_173_iterations.npz"),
+        find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz"),
         ])
     
     
@@ -99,10 +99,10 @@ def train():
     
 
     # overfit on small subset first
-    x_train = x_train[0:-1:5]
-    x_val = x_val[0:-1:5]
-    y_train = y_train[0:-1:5]
-    y_val = y_val[0:-1:5]
+    x_train = x_train[0:-1:1]
+    x_val = x_val[0:-1:1]
+    y_train = y_train[0:-1:1]
+    y_val = y_val[0:-1:1]
 
     print("Length of dataset", len(x_train))
 

@@ -134,8 +134,9 @@ class AgileContinousDataset(torch.utils.data.Dataset):
 
         print("extracted total X data of length:", len(x))
         print("extracted total Y labels of length:", len(y))
+
         self.x =  torch.tensor(x).to(torch.float32)
-        self.y =  torch.tensor(y).to(torch.float32).unsqueeze(1)
+        self.y =  torch.tensor(y).to(torch.float32)
         self.N = len(self.x)
 
 def equivariant_agile_transform(u1_states, u2_states):

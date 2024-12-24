@@ -1,9 +1,11 @@
-import torch, pickle, randomname, sys, math
+import torch, pickle, randomname, sys, math, os
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random as rnd
 from shapely.geometry import Polygon, Point
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from tabulate import tabulate
 sys.path.append('../../uav/')
 from uav import *
 
@@ -1431,7 +1433,7 @@ def extract_and_plot_data(data_set_paths=None,
     u2_rps_rot = zip(u2_avg_rps, u2_rotations)
 
     
-    overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 0.6)[0]
+    overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 10.6)[0]
     overlaps = np.array(time_seq)[overlap_indices]
 
     # 2 compute uav actual forces, smooth them, and compute controller z-axis forces, and their residual disturbance
@@ -1515,6 +1517,30 @@ def extract_and_plot_data(data_set_paths=None,
                  uav_2_states=uav_2_states, 
                  dw_forces=u2_z_dw_forces)
 
+
+def extract_data(uav_1_states, uav_2_states, time_seq):
+    plot = True
+    mass = 3.035
+    g = -9.85
+
+
+    # 1 extract necessary parameters from uav states
+    u2_rotations = [R.from_euler('xyz', [yaw_pitch_roll[2], yaw_pitch_roll[1], yaw_pitch_roll[0]], degrees=False) for yaw_pitch_roll in np.array(uav_2_states)[:,9:12]]
+    u2_avg_rps = np.mean(np.abs(np.array(uav_2_states)[:,22:26]), axis=1)
+    u2_rps_rot = zip(u2_avg_rps, u2_rotations)
+
+
+    overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 3.5)[0]
+    overlaps = np.array(time_seq)[overlap_indices]
+
+    # 2 compute uav actual forces, smooth them, and compute controller z-axis forces, and their residual disturbance
+    u2_accelerations = np.array(uav_2_states)[:,8]
+    u2_z_forces = u2_accelerations * mass
+    smoothed_u2_z_forces = smooth_with_savgol(u2_z_forces, window_size=21, poly_order=1)
+    u2_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[2] + (g*mass) for (avg_rps, u2_rotations) in u2_rps_rot]
+    u2_z_dw_forces = smoothed_u2_z_forces - u2_thrusts
+
+    return u2_z_dw_forces, overlap_indices, overlaps
 
 
 
@@ -1621,3 +1647,72 @@ def compute_torques(r1, r2, r3, r4):
     return tau_x, tau_y, tau_z
 
 
+def find_file_with_substring(substring):
+    """
+    Search for a file containing the given substring in its name within the current directory and subdirectories.
+    
+    Args:
+        substring (str): The substring to look for in the file name.
+    
+    Returns:
+        str: The full path of the file if found, or None if not found.
+    """
+    root_dir = "../../../../" # Set the root directory to the current working directory
+    for dirpath, _, filenames in os.walk(root_dir):
+        for filename in filenames:
+            if substring in filename:
+                return os.path.abspath(os.path.join(dirpath, filename))
+    return None
+
+
+def compute_metrics(y_true, y_pred):
+    """
+    Compute RMSE, NRMSE, MAE, and R2 score between true and predicted values.
+    Args:
+        y_true (array): Ground truth values.
+        y_pred (array): Predicted values.
+    Returns:
+        dict: A dictionary with RMSE, NRMSE, MAE, and R2 score.
+    """
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    #nrmse_range = rmse / (np.max(y_true) - np.min(y_true))  # Range-normalized RMSE
+    nrmse_range = rmse / np.mean(y_true)  # Range-normalized RMSE
+
+    mae = mean_absolute_error(y_true, y_pred)
+    r2 = r2_score(y_true, y_pred)
+    return {
+        "RMSE": rmse,
+        "NRMSE (Mean)": nrmse_range,
+        "MAE": mae,
+        "R2 Score": r2
+    }
+
+
+
+def compute_weighted_metrics(results, sample_sizes):
+    """
+    Compute weighted RMSE, MAE, and R2 score across datasets.
+    Args:
+        results (list of dicts): List of metrics per dataset.
+        sample_sizes (list): Number of samples for each dataset.
+    Returns:
+        dict: Weighted RMSE, MAE, and R2 score.
+    """
+    total_samples = sum(sample_sizes)
+
+    # Weighted RMSE: Combine squared errors
+    weighted_rmse = np.sqrt(
+        sum((result["RMSE"] ** 2) * n for result, n in zip(results, sample_sizes)) / total_samples
+    )
+
+    # Weighted MAE: Combine absolute errors
+    weighted_mae = sum(result["MAE"] * n for result, n in zip(results, sample_sizes)) / total_samples
+
+    # Weighted R2: Average the R2 scores, weighted by sample sizes
+    weighted_r2 = sum(result["R2 Score"] * n for result, n in zip(results, sample_sizes)) / total_samples
+
+    return {
+        "Weighted RMSE": weighted_rmse,
+        "Weighted MAE": weighted_mae,
+        "Weighted R2": weighted_r2
+    }

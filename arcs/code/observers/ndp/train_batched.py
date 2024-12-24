@@ -53,7 +53,7 @@ def test_nn(model, eval_loader):
 
     
     print(f"Validation Loss: {total_loss/len(eval_loader):.6f}")
-    return total_loss/len(train_loader)
+    return total_loss/len(eval_loader)
     #print(f"Epoch Validation Loss: {total_loss:.6f}")
 
 
