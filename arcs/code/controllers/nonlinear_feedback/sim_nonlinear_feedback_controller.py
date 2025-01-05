@@ -6,21 +6,21 @@ np.set_printoptions(suppress=True)
 
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from scipy.spatial.transform import Rotation as R
 import sys, os
 #sys.path.append('../../observers/baseline/')
 #sys.path.append('../../uav/')
 sys.path.append('../../utils/')
-from uav import *
+
 from utils import *
 
 #rot = 1.570796326794897
 
 nfc = NonlinearFeedbackController()
 #nfc.target_yaw = rot
-Fg = -9.81*3.035
-#target_acc = [0.0, 0.0, 0.1]
 
-target_waypoint = np.array([0.0,0.0,3.0, 
+target_waypoint = np.array([0.2,0.2,0.2, 
                             0.0,0.0,0.0,
                             0.0,0.0,0.0]) # pos, acc, vel
 
@@ -63,7 +63,7 @@ def main(controller):
     r3_joint_sensor_idx = controller.get_sensor_info("uav_2_r3_joint_sensor").index
     r4_joint_sensor_idx = controller.get_sensor_info("uav_2_r4_joint_sensor").index
 
-    hovertime = 2.0
+    hovertime = 0.0
     throttle = 0.3347 # 0.3325 too low, 0.335 too high
 
     # Start simulation
@@ -74,43 +74,63 @@ def main(controller):
     time_step = controller.get_time_step()
 
     # Calculate time steps between one control period
-    control_frequency = 200.0
+    control_frequency = 100.0
     steps_per_call = int(1.0 / control_frequency / time_step)
 
     # Initialize timer
     t = 0.0
     measured_a_zs = []
     avg_rps_list = []
+    positions = []
+
+    thrust_nfc = []
+    thrust_ac = []
+
+    
 
     # Simulation loop, simulating for 20 seconds (simulation time, not physical time)
-    while (t < 10.0):
+    while (t < 30.0):
         # Set px4 control input to do position tracking of a circle trajectory
         # See actuator.md for details of input
-        print(t)
         if t > hovertime:
+            print(" ------------------ ")
+            #print("t:",t)
 
             #target_rot += 0.02
 
-
             
-            nfc.target_yaw = target_rot * np.pi/180
+            positions.append(pos)
+            print("position:",positions[-1])
 
-            roll, pitch, yaw, thrust = nfc.nonlinear_feedback(target_waypoint)
+            nfc.target_yaw = target_rot * np.pi/180.0
+            nfc.target_yaw = 0.0
+
+
+            roll, pitch, yaw, thrust = nfc.nonlinear_feedback_nf(target_waypoint)
             roll, pitch, yaw = np.array([roll, pitch, yaw]) * 180.0/np.pi
+            
+            if t > hovertime + 222.0:
+                #roll, pitch, yaw, thrust = nfc.set_xyz_force(0.0,-29.77,3.0)
+                pass
+            
+            #roll, pitch, yaw = np.array([0, 0, yaw]) * 180.0/np.pi
+            
 
-            # todo: mismatch rotation attitude and highlevel position controller
-            # print and visualize both
+
+
+           
             qw, qx, qy, qz = euler_angles_to_quaternion(roll, pitch, yaw)
             throttle = thrust * nfc.TWR
+            #print("Throttle for attitu. contrl.", throttle)
 
-            print("thrust from attitude controller", thrust)
+            print("thrust for attit. contrl.", thrust)
             #print("throttle set:", throttle)
             px4_input = (1.0, qw, qx, qy, qz, 0.0, throttle) # This is the actuator input vector
 
 
 
         else:
-            px4_input = (0.0, 0.0, 0.0, 0.5, nan, nan, nan, nan, nan, nan, 0.0, nan) 
+            px4_input = (0.0, 0.0, 0.0, 1.0, nan, nan, nan, nan, nan, nan, 0.0, nan) 
             #px4_input = (0.0, nan, nan, nan, 0.0, 1.0, 0.0, nan, nan, nan, 1.570796326794897, nan) 
 
 
@@ -119,11 +139,11 @@ def main(controller):
         imu_data = reply.get_sensor_output(imu_index)
 
         pos = imu_data[:3]
-        print("current pos", pos)
-        vel = imu_data[3:6]
-        acc = imu_data[6:9]
+        vel = imu_data[6:9]
+        acc = imu_data[12:15]
 
         nfc.feedback(pos, vel, acc)
+
 
 
         a_z = imu_data[14]
@@ -179,57 +199,17 @@ def main(controller):
     print("max. recorded rps:", np.max(avg_rps_list))
     print("min. recorded rps:", np.min(avg_rps_list))
 
-
-    thrusts = [rps_to_thrust_p005_mrv80(avg_rps) - 9.81*mass for avg_rps in avg_rps_list]
-    uav_z_forces = np.array(measured_a_zs)*mass
-
-    fig = plt.subplot()
-    fig.plot(moving_average(uav_z_forces, 20), label="UAV's z-axis forces")
-    fig.plot(thrusts, label="controller's \n rps forces")
-    plt.legend()
-    plt.show()
-
-    ignore_first_k = 200
-    data = uav_z_forces[ignore_first_k:]
-    # Parameters for the running average and variance
-    window_size = 20  # Adjust the window size as needed
-
-    # Compute running average and running variance
-    running_avg = np.convolve(data, np.ones(window_size) / window_size, mode='valid')
-    running_var = [np.var(data[i:i + window_size]) for i in range(len(data) - window_size + 1)]
-    running_std_dev = np.sqrt(running_var)
-    # compute total variance
-    total_var = np.full(len(running_avg),np.var(running_avg))
-    total_std = np.sqrt(total_var)
-    # Define the x-axis for the running metrics
-    x_vals = np.arange(window_size - 1, len(data))
-
-    # Plotting
-    plt.figure(figsize=(12, 6))
-    plt.plot(data, label="IMU Measurements", linewidth=0.4)
-
-    # Plot the variance tube (1 standard deviation above and below the running average)
-    plt.fill_between(x_vals, 
-                     running_avg - total_std, 
-                     running_avg + total_std, 
-                    color='orange', 
-                    alpha=0.4, 
-                    label="Variance (±1 STD)")
     
-    plt.plot(x_vals, running_avg, color='orange', label="Running Average", linewidth=2)
+    
+    plot_positions_with_references(positions, 
+                                   x_refs=target_waypoint[0], 
+                                   y_refs=target_waypoint[1], 
+                                   z_refs=target_waypoint[2])
 
-    # adjust length of input u to averaged measurements:
-    thrusts = thrusts[ignore_first_k:]
-    plt.plot(x_vals, thrusts[window_size-1:len(data)], label="controller's input thrust", linewidth=2, color="magenta")
-
-
-    # Labels and legend
-    plt.xlabel("Timesteps")
-    plt.ylabel("Value")
-    plt.title("Raw IMU measurement and its running average for smoother measurements")
-    plt.legend()
-    plt.show()
-
+    
+    analyze_and_plot_forces(avg_rps_list, measured_a_zs, mass, rps_to_thrust_p005_mrv80, 
+                            ignore_first_k=200, window_size=30)
+ 
     
     
 controller = None

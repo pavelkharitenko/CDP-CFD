@@ -23,7 +23,7 @@
             - -350.0
           p600__rotor_3_joint:
             - -350.0
-      - file_path: "floor.urdf"
+      #- file_path: "floor.urdf"
 
   fluid:
     blocks:
@@ -42,7 +42,7 @@
     coupling:
       search_center_target_skeleton_name: "p600"
       ignore_skeletons:
-        - "floor"
+      #  - "floor"
 
   virtual_propellers:
     coupling:

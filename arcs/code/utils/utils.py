@@ -1716,3 +1716,109 @@ def compute_weighted_metrics(results, sample_sizes):
         "Weighted MAE": weighted_mae,
         "Weighted R2": weighted_r2
     }
+
+
+def plot_positions_with_references(positions, x_refs, y_refs, z_refs):
+    """
+    Plots x, y, and z positions and their reference values in separate figures.
+
+    :param x_positions: List of x positions over time.
+    :param y_positions: List of y positions over time.
+    :param z_positions: List of z positions over time.
+    :param x_refs: List of reference x positions over time.
+    :param y_refs: List of reference y positions over time.
+    :param z_refs: List of reference z positions over time.
+    """
+    x_positions = [xyz[0] for xyz in positions]
+    y_positions = [xyz[1] for xyz in positions]
+    z_positions = [xyz[2] for xyz in positions]
+
+    n_meas = len(x_positions)
+    time_steps = range(n_meas)
+
+    # Plot x positions
+    plt.figure(figsize=(8, 4))
+    plt.plot(time_steps, x_positions, label="X Positions")
+    plt.plot(time_steps, np.full(n_meas,x_refs), label="X References", linestyle="--")
+    plt.xlabel("Time Steps")
+    plt.ylabel("X Position")
+    plt.title("X Positions and References")
+    plt.legend()
+    plt.grid()
+    
+
+    # Plot y positions
+    plt.figure(figsize=(8, 4))
+    plt.plot(time_steps, y_positions, label="Y Positions")
+    plt.plot(time_steps, np.full(n_meas,y_refs), label="Y References", linestyle="--")
+    plt.xlabel("Time Steps")
+    plt.ylabel("Y Position")
+    plt.title("Y Positions and References")
+    plt.legend()
+    plt.grid()
+    
+
+    # Plot z positions
+    plt.figure(figsize=(8, 4))
+    plt.plot(time_steps, z_positions, label="Z Positions")
+    plt.plot(time_steps, np.full(n_meas,z_refs), label="Z References", linestyle="--")
+    plt.xlabel("Time Steps")
+    plt.ylabel("Z Position")
+    plt.title("Z Positions and References")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+def analyze_and_plot_forces(avg_rps_list, measured_a_zs, mass, rps_to_thrust_func, ignore_first_k=200, window_size=20):
+    """
+    Analyze and plot UAV forces and control inputs.
+
+    :param avg_rps_list: List of average RPS values.
+    :param measured_a_zs: List of measured accelerations along the z-axis.
+    :param mass: Mass of the UAV.
+    :param rps_to_thrust_func: Function to compute thrust from RPS.
+    :param ignore_first_k: Number of initial data points to ignore for analysis.
+    :param window_size: Window size for running average and variance calculation.
+    """
+    # Compute thrusts and UAV forces
+    thrusts = [rps_to_thrust_func(avg_rps) - 9.81 * mass for avg_rps in avg_rps_list]
+    uav_z_forces = np.array(measured_a_zs) * mass
+
+    # Plot UAV forces and controller forces
+    plt.figure(figsize=(10, 5))
+    plt.plot(moving_average(uav_z_forces, window_size), label="UAV's z-axis forces")
+    plt.plot(thrusts, label="Controller's RPS forces")
+    plt.legend()
+    plt.show()
+
+    # Analyze data after ignoring initial points
+    data = uav_z_forces[ignore_first_k:]
+    running_avg = np.convolve(data, np.ones(window_size) / window_size, mode='valid')
+    running_var = [np.var(data[i:i + window_size]) for i in range(len(data) - window_size + 1)]
+    running_std_dev = np.sqrt(running_var)
+
+    # Compute total variance and standard deviation
+    total_var = np.full(len(running_avg), np.var(running_avg))
+    total_std = np.sqrt(total_var)
+
+    # Define x-axis for the metrics
+    x_vals = np.arange(window_size - 1, len(data))
+
+    # Plot running metrics and variance tube
+    plt.figure(figsize=(12, 6))
+    plt.plot(data, label="IMU Measurements", linewidth=0.4)
+    plt.fill_between(x_vals, running_avg - total_std, running_avg + total_std, 
+                     color='orange', alpha=0.4, label="Variance (±1 STD)")
+    plt.plot(x_vals, running_avg, color='orange', label="Running Average", linewidth=2)
+
+    # Adjust thrusts length for comparison
+    thrusts = thrusts[ignore_first_k:]
+    plt.plot(x_vals, thrusts[window_size-1:len(data)], label="Controller's Input Thrust", 
+             linewidth=2, color="magenta")
+
+    # Labels, title, and legend
+    plt.xlabel("Timesteps")
+    plt.ylabel("Value")
+    plt.title("Raw IMU Measurement and Running Average for Smoother Measurements")
+    plt.legend()
+    plt.show()
