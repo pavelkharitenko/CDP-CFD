@@ -28,8 +28,8 @@ class NonlinearFeedbackController:
         #self.M = np.eye(3) * self.uav_mass
         self.G = self.uav_mass * np.array([0, 0, self.g])
 
-        self.k_p = np.full(3, 15.0)
-        self.k_i = np.full(3,0.0) # 0.23
+        self.k_p = np.array([15.0,15.0, 25.0]) #np.full(3, 15.0)
+        self.k_i = np.full(3,0.6) # 0.23
         
         self.k_d = np.full(3, 0.5)
 
@@ -114,27 +114,7 @@ class NonlinearFeedbackController:
         q_r_dot_dot = desired[6:9] - self.Lambda * q_tilde_dot # see Neural-Lander for this term
         
         self.s_int = s * self.dt + self.s_int
-        #print("Ki*s_int", self.k_i*self.s_int)
-        #self.s_int = np.clip(self.s_int, -20.0, 20.0)
 
-
-
-        #s_dot = (s - self.s_old) / self.dt
-
-        #print("Kd*s_dot", self.k_d*s_dot)
-        #print("Kp*s", self.k_p * s)
-
-        
-        #yaw_err = self.target_yaw - ref[6]
-
-        #print("self.uav_mass * acc_ref", self.uav_mass * acc_ref)
-        
-        #self.s_old = s
-        #self.G = np.zeros(3)
-        #print("x_err", np.round(x_err,2))
-        #print("v_err", np.round(v_err, 2))
-        #print("acc_ref", np.round(acc_ref, 2))
-        #print("s",s)
 
         u = self.uav_mass * q_r_dot_dot + self.G - self.k_p * s - self.k_i * self.s_int 
 

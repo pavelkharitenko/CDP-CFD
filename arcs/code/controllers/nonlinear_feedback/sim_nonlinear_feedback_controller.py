@@ -15,12 +15,12 @@ sys.path.append('../../utils/')
 
 from utils import *
 
-#rot = 1.570796326794897
+
 
 nfc = NonlinearFeedbackController()
-#nfc.target_yaw = rot
 
-target_waypoint = np.array([0.2,0.2,0.2, 
+
+target_waypoint = np.array([0.0,0.0,0.0, 
                             0.0,0.0,0.0,
                             0.0,0.0,0.0]) # pos, acc, vel
 
@@ -46,7 +46,7 @@ def main(controller):
     nan = float('NaN')
     mass = 3.035 # P600 weight
 
-    target_rot = 0.0
+    target_rot = 20.0
 
     
 
@@ -89,7 +89,7 @@ def main(controller):
     
 
     # Simulation loop, simulating for 20 seconds (simulation time, not physical time)
-    while (t < 30.0):
+    while (t < 6.0):
         # Set px4 control input to do position tracking of a circle trajectory
         # See actuator.md for details of input
         if t > hovertime:
@@ -103,7 +103,7 @@ def main(controller):
             print("position:",positions[-1])
 
             nfc.target_yaw = target_rot * np.pi/180.0
-            nfc.target_yaw = 0.0
+            #nfc.target_yaw = 0.0
 
 
             roll, pitch, yaw, thrust = nfc.nonlinear_feedback_nf(target_waypoint)
