@@ -4,8 +4,8 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class Planner:
     def __init__(self, start=(0.0, 0.0, 0.0), end=(5.0, 0.0, 0.0), 
-                 step_size=0.1, velocity=0.3, acceleration_time=1.0, 
-                 radius=2.0, circular=False):
+                 step_size=0.1, velocity=0.3, acceleration_time=1.0, hovertime=0.0, 
+                 radius=2.0, circular=False, initial_yaw=0.0):
         self.start = np.array(start)
         self.end = np.array(end)
         self.step_size = step_size
@@ -14,6 +14,7 @@ class Planner:
         self.radius = radius
         self.circular = circular
         self.current_index = 0
+        self.initial_yaw = initial_yaw
         
         if self.circular:
             self.trajectory = self._generate_circle_trajectory()
@@ -38,7 +39,7 @@ class Planner:
         waypoints = [self.start + direction * sum(velocities_magnitudes[:i]) * self.step_size for i in range(num_waypoints)]
         velocities = [vel_magnitude * direction for vel_magnitude in velocities_magnitudes]
         accelerations = np.gradient(velocities, axis=0) / self.step_size
-        yaws = [0.0 for _ in range(num_waypoints)]  # Zero yaw for linear trajectory
+        yaws = [self.initial_yaw for _ in range(num_waypoints)]  # keep yaw as is for linear trajectory
         
         trajectory = [np.array([*waypoint, *velocity, *acceleration, yaw]) 
                       for waypoint, velocity, acceleration, yaw in zip(waypoints, velocities, accelerations, yaws)]

@@ -14,7 +14,7 @@ class NonlinearFeedbackController:
         self.dt = dt
         self.uav_mass = uav_mass
 
-        self.target_yaw = target_yaw
+        self.target_yaw = target_yaw # must be in radians
         self.g = 9.81
         self.throttle_hover = 0.3347 # for 80.0, and 0.05 res
         #self.throttle_hover = 0.3347 + 0.003 # for 80.0, and 0.05 res
@@ -124,16 +124,18 @@ class NonlinearFeedbackController:
     
 
     def set_xyz_force(self, x_force, y_force, z_force):
-        """ Setting 0,0,0 means hovering"""
+        """ 
+        Converts f_xyz vector to required roll, pitch, yaw and thrust for attitude controllers.
+        Implemented acc. to Filho et al. "Trajectory Tracking for a Quadrotor System: A Flatness-based 
+        Nonlinear Predictive Control Approach".
+
+        Setting 0,0,0 means hovering.
+        """
         
         
         x_acc = x_force/self.uav_mass + 1e-12
         y_acc = y_force/self.uav_mass + 1e-12
         z_acc = z_force/self.uav_mass + 1e-12
-
-        #x_acc = 0.0
-        #y_acc = 0.0
-
 
 
         pitch = np.arctan((x_acc*np.cos(self.target_yaw) + y_acc * np.sin(self.target_yaw))
@@ -148,26 +150,35 @@ class NonlinearFeedbackController:
                                                                   #+ self.g
                                                                   ) # magnitude
 
-        #thrust = np.clip(thrust, -1.1*self.uav_mass*self.g,1.1*self.uav_mass*self.g)
-        #print("z_acc", z_acc)
+        
         
         return -roll, pitch, self.target_yaw, thrust
     
-    def nonlinear_feedback(self, desired):
-        f_xyz = self.position_controller(desired)
 
-        print("F_xyz from position controller:", f_xyz)
 
-        
-        return self.set_xyz_force(*f_xyz)
-        #return self.set_xyz_force(.0,.0,.0)
-
-    def nonlinear_feedback_nf(self, desired):
+    def nonlinear_feedback(self, desired, feedforward=np.zeros(3)):
         f_xyz = self.pc_nf(desired)
         print("F_xyz from nf controller:", f_xyz)
 
+        f_xyz = f_xyz + feedforward
+
+        print("after feedforward term", f_xyz)
+
         return self.set_xyz_force(*f_xyz)
-        
+
+    def nonlinear_feedback_qt_px4(self, desired, feedforward=np.zeros(3)):
+        """
+        Nonlinear feedback output force, and converted to RPY-thrust for px4 attitude controller
+        """
+        roll, pitch, yaw, thrust = self.nonlinear_feedback(desired, feedforward)
+
+        roll, pitch, yaw = np.array([roll, pitch, yaw]) * 180.0/np.pi # convert to radians
+
+        qw, qx, qy, qz = euler_angles_to_quaternion(roll, pitch, yaw)
+        throttle = thrust * self.TWR
+        px4_input = (1.0, qw, qx, qy, qz, 0.0, throttle) # This is the actuator input vector
+
+        return px4_input
 
     def align_vector(self, target_vector, thrust_vector):
         """
