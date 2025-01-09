@@ -15,7 +15,7 @@ from planner import Planner
 from utils import *
 
 nan = float('NaN')
-planner = Planner(velocity=1.5, acceleration_time=2.7, end=(16,0,0))
+planner = Planner(velocity=1.5, acceleration_time=4.5, end=(16,0,0))
 #planner = Planner(circular=True, velocity=1.2, step_size=0.1, acceleration_time=1.0, radius=2.0)
 nfc = NonlinearFeedbackController()
 

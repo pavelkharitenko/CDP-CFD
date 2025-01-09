@@ -10,7 +10,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class NonlinearFeedbackController:
     """Sets UAV via attitude controller to fly with certain force in each x,y,z-axis"""
-    def __init__(self, uav_mass=3.035, target_yaw=0.0, dt=0.01):
+    def __init__(self, uav_mass=3.035, target_yaw=0.0, dt=0.001):
         self.dt = dt
         self.uav_mass = uav_mass
 
@@ -23,17 +23,18 @@ class NonlinearFeedbackController:
 
         self.s_int = np.zeros(3)
         self.s_old = np.zeros(3)
+        self.s_dot = np.zeros(3)
 
 
         #self.M = np.eye(3) * self.uav_mass
         self.G = self.uav_mass * np.array([0, 0, self.g])
 
-        self.k_p = np.array([15.0,15.0, 25.0]) #np.full(3, 15.0)
-        self.k_i = np.full(3,0.6) # 0.23
+        self.k_p = np.array([3.0,3.0,8.0]) #np.full(3, 15.0) 
+        self.k_i = np.array([0.5,0.5,0.3]) # 0.23
         
-        self.k_d = np.full(3, 0.5)
+        self.k_d = np.full(3, 31.0) * 0.0
 
-        self.Lambda = 1.0
+        self.Lambda = 3.0
 
         self.pos = np.zeros(3)
         self.vel = np.zeros(3)
@@ -108,6 +109,9 @@ class NonlinearFeedbackController:
         
         q_tilde = self.pos - desired[:3]
         q_tilde_dot = self.vel - desired[3:6]
+
+        print("VELOCITY ERRORS", q_tilde_dot)
+        q_tilde_dot = np.array([q_tilde_dot[0], q_tilde_dot[1], np.clip(q_tilde_dot[2], -0.5,0.5)])
         
         s = q_tilde_dot + self.Lambda * q_tilde
         
@@ -115,8 +119,12 @@ class NonlinearFeedbackController:
         
         self.s_int = s * self.dt + self.s_int
 
+        self.s_dot = s - self.s_old
 
-        u = self.uav_mass * q_r_dot_dot + self.G - self.k_p * s - self.k_i * self.s_int 
+
+        u = self.uav_mass * q_r_dot_dot + self.G - self.k_p * s - self.k_i * self.s_int # + self.k_d * self.s_dot
+
+        self.s_old = s
 
 
         return u
@@ -152,6 +160,7 @@ class NonlinearFeedbackController:
 
         
         
+        #thrust = np.clip(thrust, 0.0, 40.0)
         return -roll, pitch, self.target_yaw, thrust
     
 
@@ -160,7 +169,7 @@ class NonlinearFeedbackController:
         f_xyz = self.pc_nf(desired)
         print("F_xyz from nf controller:", f_xyz)
 
-        f_xyz = f_xyz + feedforward
+        f_xyz = f_xyz - feedforward
 
         print("after feedforward term", f_xyz)
 
@@ -171,6 +180,7 @@ class NonlinearFeedbackController:
         Nonlinear feedback output force, and converted to RPY-thrust for px4 attitude controller
         """
         roll, pitch, yaw, thrust = self.nonlinear_feedback(desired, feedforward)
+        print("thrust:", thrust)
 
         roll, pitch, yaw = np.array([roll, pitch, yaw]) * 180.0/np.pi # convert to radians
 

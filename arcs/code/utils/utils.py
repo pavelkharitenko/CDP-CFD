@@ -1864,7 +1864,7 @@ def compute_trajectory_errors(actual_positions, actual_velocities, planned_posit
 
 def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_uav1, actual_velocities_uav1, 
                                       actual_positions_uav2, planned_positions_uav2, actual_velocities_uav2, 
-                                      ignore_start=0, ignore_end=0):
+                                      ignore_start=0, ignore_end=0, feedforward=[]):
     """
     Used to plot tracking errors, velocities, and relative distances of two UAVs.
     """
@@ -1903,8 +1903,11 @@ def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_u
     
     # Relative XY Distance Plot
     sns.lineplot(x=np.arange(len(rel_xy_distances)), y=rel_xy_distances, ax=axes[2, 0], label='Rel. XY Dist.', color='cyan')
+    if len(feedforward) > 0:
+        sns.lineplot(x=np.arange(len(feedforward)), y=feedforward*0.1, ax=axes[2, 0], label='Predicted Z-force', color='magenta')
+
     axes[2, 0].set_title('Relative XY Distance between UAV1 and UAV2')
-    axes[2, 0].set_ylabel('Distance (m)')
+    axes[2, 0].set_ylabel('Distance (m) and Feedforward forces from predictor')
     for index in overlap_indices:
         axes[2, 0].axvline(index, color='red', linestyle='--', alpha=0.3)
 
