@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 
-class NonlinearFeedbackController:
+class NonlinearFeedbackController3:
     """Sets UAV via attitude controller to fly with certain force in each x,y,z-axis"""
-    def __init__(self, uav_mass=3.035, target_yaw=0.0, dt=0.005):
+    def __init__(self, uav_mass=3.035, target_yaw=0.0, dt=0.001):
         self.dt = dt
         self.uav_mass = uav_mass
 
@@ -21,7 +21,7 @@ class NonlinearFeedbackController:
 
         self.TWR = self.throttle_hover / (self.uav_mass * self.g)  # thrust to weight ratio
 
-        self.s_int = np.zeros(3)
+        self.s2_int = np.zeros(3)
         self.s_old = np.zeros(3)
         self.s_dot = np.zeros(3)
 
@@ -29,13 +29,12 @@ class NonlinearFeedbackController:
         #self.M = np.eye(3) * self.uav_mass
         self.G = self.uav_mass * np.array([0, 0, self.g])
 
-        self.k_p = np.array([4.0,4.0,4.0]) #np.full(3, 15.0) 
-        self.k_i = np.array([0.5,0.0,0.0]) # 0.23
+        self.k_p = np.array([3.0,3.0, 32.0]) #np.array([3.0,3.0, 18.0]) 
+        self.k_v = np.array([3.0,3.0, 27.0]) #np.array([3.0,3.0, 15.0]) 
+
         
-        self.k_d = np.full(3, 31.0) * 0.0
-
-        self.Lambda = 7.0
-
+        
+        
         self.pos = np.zeros(3)
         self.vel = np.zeros(3)
         self.acc = np.zeros(3)
@@ -53,83 +52,23 @@ class NonlinearFeedbackController:
         self.acc = np.array(acc)
         
 
-    def position_controller(self, desired):
+    def pc_nf(self, desired, f_ext=np.zeros(3)):
         """
-        Reads current error from reference position and returns target x,y,z forces.
-        From: "Neural-Fly Enables Rapid Learning for Agile Flight in Strong Winds" O'Connell et al.
-        u = Mq *q_dot_dot + g  - K*s - K_i*Int(s)
-
-        desired: R^9 vector of p_des, v_des, a_des
-        """
-        x_err = self.pos - desired[:3] # p_tilde
-        v_err = self.vel - desired[3:6] # p_dot_tilde
-        s = v_err - self.Lambda * x_err
-        
-        
-        self.s_int = s * self.dt + self.s_int
-        print("Ki*s_int", self.k_i*self.s_int)
-        self.s_int = np.clip(self.s_int, -20.0, 20.0)
-
-
-
-        s_dot = (s - self.s_old) / self.dt
-
-        #print("Kd*s_dot", self.k_d*s_dot)
-        print("Kp*s", self.k_p * s)
-
-        
-        #yaw_err = self.target_yaw - ref[6]
-
-        acc_ref = desired[6:9] - self.Lambda * v_err # see Neural-Lander for this term
-        #print("self.uav_mass * acc_ref", self.uav_mass * acc_ref)
-        
-        self.s_old = s
-        #self.G = np.zeros(3)
-        print("x_err", np.round(x_err,2))
-        print("v_err", np.round(v_err, 2))
-        #print("acc_ref", np.round(acc_ref, 2))
-        #print("s",s)
-        fd = self.uav_mass * acc_ref + self.G - self.k_p * s - self.k_i * self.s_int - self.k_d * s_dot
-        #fd = - self.k_p * s - self.k_i * self.s_int - self.k_d * s_dot
-
-        #fd = self.uav_mass * acc_ref - self.G - self.Kp * s
-
-        u = fd
-
-
-        return u
-
-    
-    def pc_nf(self, desired):
-        """
-        Reads current error from reference position and returns target x,y,z forces.
-        From: "Neural-Fly Enables Rapid Learning for Agile Flight in Strong Winds" O'Connell et al.
-        u = Mq *q_dot_dot + g  - K*s - K_i*Int(s)
-
-        desired: R^9 vector of p_des, v_des, a_des
+        Nonlin. Feedback from Li et al. "Hybrid model-based and data-driven 
+        disturbance prediction for precise quadrotor trajectory tracking"
         """
         
-        q_tilde = self.pos - desired[:3]
-        q_tilde_dot = self.vel - desired[3:6]
-
-        print("VELOCITY ERRORS", q_tilde_dot)
-        #q_tilde_dot = np.array([q_tilde_dot[0], q_tilde_dot[1], np.clip(q_tilde_dot[2], -0.3,0.3)])
+        p_hat = desired[:3] - self.pos
+        v_hat = desired[3:6] - self.vel
+        a_fb = self.k_p * p_hat + self.k_v * v_hat
+        a_r = desired[6:9]
+        m = self.uav_mass 
         
-        s = q_tilde_dot + self.Lambda * q_tilde
+
+        f_des = m*a_fb + m*a_r + self.G - f_ext
+
         
-        q_r_dot_dot = desired[6:9] - self.Lambda * q_tilde_dot # see Neural-Lander for this term
-        
-        self.s_int = s * self.dt + self.s_int
-
-        self.s_dot = s - self.s_old
-
-
-        u = self.uav_mass * q_r_dot_dot + self.G - self.k_p * s # - self.k_i * self.s_int
-
-        self.s_old = s
-
-
-        return u
+        return f_des
 
 
     def set_xyz_force(self, x_force, y_force, z_force):
@@ -167,20 +106,13 @@ class NonlinearFeedbackController:
 
 
     def nonlinear_feedback(self, desired, feedforward=np.zeros(3), uav_z_force=0):
-        f_xyz = self.pc_nf(desired)
+        f_xyz = self.pc_nf(desired, feedforward)
         self.fxyz = f_xyz
-        print("F_xyz from nf controller:", f_xyz)
-
-        #if f_xyz[2] < 0.0: 
-        #    f_z_des = f_xyz[2]
-        #else: 
-        #f_z_des = feedforward[2] * -1.0
-    
-        #f_xyz = np.array([f_xyz[0], f_xyz[1], f_xyz[2] + np.clip(f_z_des - f_xyz[2], 0, f_z_des)])
+        
 
 
-        f_xyz = f_xyz - feedforward
-        print("after feedforward term", f_xyz)
+        #f_xyz = f_xyz - feedforward
+        print("f_xyz with feedforward", f_xyz)
         return self.set_xyz_force(*f_xyz)
         
 

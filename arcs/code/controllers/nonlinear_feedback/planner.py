@@ -4,50 +4,64 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class Planner:
     def __init__(self, start=(0.0, 0.0, 0.0), end=(5.0, 0.0, 0.0), 
-                 step_size=0.1, velocity=0.3, acceleration_time=1.0, hover_time=0.0, 
-                 radius=2.0, circular=False, initial_yaw=0.0):
+                dt=0.1, velocity=0.3, acceleration_time=1.0, hover_time=0.0, 
+                radius=2.0, traj_type=0, initial_yaw=0.0):
         self.start = np.array(start)
         self.end = np.array(end)
-        self.step_size = step_size
+        self.dt = dt
         self.velocity = velocity
-        self.acceleration_time = acceleration_time  # Time to reach target velocity
-        self.hover_time = hover_time  # Time to hover at the start position
+        self.acceleration_time = acceleration_time
+        self.hover_time = hover_time
         self.radius = radius
-        self.circular = circular
+        self.traj_type = traj_type
         self.current_index = 0
         self.initial_yaw = initial_yaw
         
-        if self.circular:
-            self.trajectory = self._generate_circle_trajectory()
-        else:
+        if self.traj_type == 0:
             self.trajectory = self._generate_linear_trajectory()
+        elif self.traj_type == 1:
+            self.trajectory = self._generate_circle_trajectory()
+        elif self.traj_type == 2:
+            self.trajectory = self._generate_horizontal_circle_trajectory()
     
     def _generate_hover_waypoints(self):
-        num_hover_points = int(self.hover_time)
+        num_hover_points = int(self.hover_time / self.dt)
         hover_waypoints = [np.array([*self.start, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, self.initial_yaw]) 
                            for _ in range(num_hover_points)]
         return hover_waypoints
 
-    def _linear_velocity_profile(self, total_time, num_waypoints):
-        velocities = np.linspace(0, self.velocity, int(self.acceleration_time / self.step_size))
-        velocities = np.concatenate((velocities, np.full(num_waypoints - len(velocities), self.velocity)))
-        return velocities
-    
+    def _smooth_acceleration_profile(self, total_time, num_waypoints):
+        # Generate a linearly increasing acceleration from 0 to the required max value
+        acceleration_points = int(self.acceleration_time / self.dt)
+        acceleration = np.linspace(0, self.velocity / self.acceleration_time, acceleration_points)
+        acceleration = np.concatenate((acceleration, np.full(num_waypoints - len(acceleration), 0.0)))
+        return acceleration
+
     def _generate_linear_trajectory(self):
         direction = self.end - self.start
         distance = np.linalg.norm(direction)
-        direction = direction / distance  # Normalize direction vector
+        direction = direction / distance
         
         total_time = distance / self.velocity
-        num_waypoints = int(total_time / self.step_size) + 1
+        num_waypoints = int(total_time / self.dt) + 1
         
-        velocities_magnitudes = self._linear_velocity_profile(total_time, num_waypoints)
+        # Get a smooth acceleration profile
+        accelerations = self._smooth_acceleration_profile(total_time, num_waypoints)
         
-        waypoints = [self.start + direction * sum(velocities_magnitudes[:i]) * self.step_size for i in range(num_waypoints)]
+        # Compute velocity as the integral of acceleration (cumulative sum of acceleration)
+        velocities_magnitudes = np.cumsum(accelerations) * self.dt
+        velocities_magnitudes = np.clip(velocities_magnitudes, 0, self.velocity)  # clip to max velocity
+        
+        # Create waypoints based on the velocity profile
+        waypoints = [self.start + direction * sum(velocities_magnitudes[:i]) * self.dt for i in range(num_waypoints)]
         velocities = [vel_magnitude * direction for vel_magnitude in velocities_magnitudes]
-        accelerations = np.gradient(velocities, axis=0) / self.step_size
-        yaws = [self.initial_yaw for _ in range(num_waypoints)]  # keep yaw as is for linear trajectory
         
+        # Calculate accelerations (second derivative of position, or first derivative of velocity)
+        accelerations = np.gradient(velocities, self.dt, axis=0)
+        
+        yaws = [self.initial_yaw for _ in range(num_waypoints)]
+        
+        # Combine position, velocity, acceleration, and yaw into the final trajectory
         trajectory = [np.array([*waypoint, *velocity, *acceleration, yaw]) 
                       for waypoint, velocity, acceleration, yaw in zip(waypoints, velocities, accelerations, yaws)]
         
@@ -59,17 +73,25 @@ class Planner:
     def _generate_circle_trajectory(self):
         circumference = 2 * np.pi * self.radius
         total_time = circumference / self.velocity
-        num_waypoints = int(total_time / self.step_size) + 1
+        num_waypoints = int(total_time / self.dt) + 1
         
         angles = np.linspace(0, 2 * np.pi, num_waypoints)
-        angles -= np.pi/2.0
-        velocities_magnitudes = self._linear_velocity_profile(total_time, num_waypoints)
+        angles -= np.pi / 2.0
         
-        waypoints = [[self.radius * np.cos(theta), self.radius * np.sin(theta) + self.radius, 0.0] for theta in angles]
+        accelerations = self._smooth_acceleration_profile(total_time, num_waypoints)
+        
+        velocities_magnitudes = np.cumsum(accelerations) * self.dt
+        velocities_magnitudes = np.clip(velocities_magnitudes, 0, self.velocity)  # clip to max velocity
+        
+        waypoints = [[self.start[0] + self.radius * np.cos(theta),
+                       self.start[1] + self.radius * np.sin(theta) + self.radius,
+                       self.start[2] + 0.0] for theta in angles]
+        
         velocities = [[-vel_magnitude * np.sin(theta), vel_magnitude * np.cos(theta), 0.0] 
                       for vel_magnitude, theta in zip(velocities_magnitudes, angles)]
-        accelerations = np.gradient(velocities, axis=0) / self.step_size
-        yaws = angles + np.pi/2.0  # Yaw follows the tangent direction to the circle
+        
+        accelerations = np.gradient(velocities, self.dt, axis=0)
+        yaws = angles + np.pi / 2.0 + self.initial_yaw
         
         trajectory = [np.array([*waypoint, *velocity, *acceleration, yaw]) 
                       for waypoint, velocity, acceleration, yaw in zip(waypoints, velocities, accelerations, yaws)]
@@ -79,18 +101,38 @@ class Planner:
         
         return full_trajectory
     
-    def adjust_waypoint(self, current_state, next_waypoint, alpha=0.5):
-        """
-        Adjusts the next waypoint based on the UAV's current state to avoid overshooting.
+    def _generate_horizontal_circle_trajectory(self):
+        circumference = 2 * np.pi * self.radius
+        total_time = circumference / self.velocity
+        num_waypoints = int(total_time / self.dt) + 1
         
-        Parameters:
-        - current_state: numpy array, the UAV's current state vector [position, velocity, acceleration].
-        - next_waypoint: numpy array, the next waypoint from the trajectory [position, velocity, acceleration, yaw].
-        - alpha: float, smoothing factor between 0 and 1 (lower values mean smoother transitions).
-
-        Returns:
-        - adjusted_waypoint: numpy array, the adjusted waypoint.
-        """
+        angles = np.linspace(0, 2 * np.pi, num_waypoints)
+        
+        accelerations = self._smooth_acceleration_profile(total_time, num_waypoints)
+        
+        velocities_magnitudes = np.cumsum(accelerations) * self.dt
+        velocities_magnitudes = np.clip(velocities_magnitudes, 0, self.velocity)  # clip to max velocity
+        
+        waypoints = [[0.0 + self.start[0], 
+                      self.radius * np.cos(theta) + self.start[1]  - self.radius, 
+                      self.radius * np.sin(theta) + self.start[2]] 
+                      for theta in angles]
+        
+        velocities = [[0.0, -vel_magnitude * np.sin(theta), vel_magnitude * np.cos(theta)] 
+                      for vel_magnitude, theta in zip(velocities_magnitudes, angles)]
+        
+        accelerations = np.gradient(velocities, self.dt, axis=0)
+        yaws = [self.initial_yaw for _ in range(num_waypoints)]
+        
+        trajectory = [np.array([*waypoint, *velocity, *acceleration, yaw]) 
+                      for waypoint, velocity, acceleration, yaw in zip(waypoints, velocities, accelerations, yaws)]
+        
+        hover_waypoints = self._generate_hover_waypoints()
+        full_trajectory = np.array(hover_waypoints + trajectory)
+        
+        return full_trajectory
+    
+    def adjust_waypoint(self, current_state, next_waypoint, alpha=0.9):
         current_position = current_state[:3]
         current_velocity = current_state[3:6]
         current_acceleration = current_state[6:9]
@@ -100,25 +142,26 @@ class Planner:
         desired_acceleration = next_waypoint[6:9]
         desired_yaw = next_waypoint[9]
         
-        # Adjust velocities and accelerations using a smoothing factor
         adjusted_velocity = current_velocity + alpha * (desired_velocity - current_velocity)
         adjusted_acceleration = current_acceleration + alpha * (desired_acceleration - current_acceleration)
         
-        # Construct the adjusted waypoint
         adjusted_waypoint = np.array([*desired_position, *adjusted_velocity, *adjusted_acceleration, desired_yaw])
         
         return adjusted_waypoint
     
-    def pop_waypoint(self, current_state, alpha=0.8):
+    def pop_waypoint(self, current_state, alpha=1.0):
         if self.current_index < len(self.trajectory):
             next_waypoint = self.trajectory[self.current_index]
             adjusted_waypoint = self.adjust_waypoint(current_state, next_waypoint, alpha)
             self.current_index += 1
             return adjusted_waypoint
         else:
-            return None
-        
-    
+            if self.traj_type == 0:
+                return self.trajectory[-1]
+            else:
+                self.current_index = 1
+                return self.pop_waypoint(current_state)
+                
     
     def plot_trajectory(self):
         waypoints = self.trajectory[:, :3]
@@ -139,8 +182,47 @@ class Planner:
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
-        ax.set_title('3D Trajectory Preview')
+        ax.set_title('Trajectory with Velocity and Acceleration Vectors')
         ax.legend()
+        
+        plt.show()
+
+
+
+    def plot_trajectory_2d(self):
+        # Extract position, velocity, and acceleration data
+        waypoints = self.trajectory[:, :3]  # Positions (x, y, z)
+        velocities = self.trajectory[:, 3:6]  # Velocities (vx, vy, vz)
+        accelerations = self.trajectory[:, 6:9]  # Accelerations (ax, ay, az)
+        
+        fig, axs = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
+        
+        # Plot positions
+        axs[0].plot(waypoints[:, 0], label='X Position', color='black')
+        axs[0].plot(waypoints[:, 1], label='Y Position', color='blue')
+        axs[0].plot(waypoints[:, 2], label='Z Position', color='green')
+        axs[0].set_ylabel('Position')
+        axs[0].set_title('Position vs Time')
+        axs[0].legend()
+        
+        # Plot velocities
+        axs[1].plot(velocities[:, 0], label='X Velocity', color='blue')
+        axs[1].plot(velocities[:, 1], label='Y Velocity', color='orange')
+        axs[1].plot(velocities[:, 2], label='Z Velocity', color='red')
+        axs[1].set_ylabel('Velocity')
+        axs[1].set_title('Velocity vs Time')
+        axs[1].legend()
+
+        # Plot accelerations
+        axs[2].plot(accelerations[:, 0], label='X Acceleration', color='red')
+        axs[2].plot(accelerations[:, 1], label='Y Acceleration', color='green')
+        axs[2].plot(accelerations[:, 2], label='Z Acceleration', color='purple')
+        axs[2].set_ylabel('Acceleration')
+        axs[2].set_title('Acceleration vs Time')
+        axs[2].legend()
+
+        axs[2].set_xlabel('Time (s)')
+        plt.tight_layout()
         plt.show()
 
 if False:

@@ -10,7 +10,7 @@ sys.path.append('../../../observers/')
 
 from agile.model import AgileShallowPredictor
 from ndp.model import DWPredictor
-from controller import NonlinearFeedbackController
+from controller3 import NonlinearFeedbackController3
 from planner import Planner
 
 from scipy.spatial.transform import Rotation as R
@@ -27,7 +27,7 @@ def main(controller):
     nan = float('NaN')
 
     # exp specific
-    SIM_MAX_DURATION = 17.0
+    SIM_MAX_DURATION = 16.0
     HOVER_DURATION = 0.0
     
     
@@ -39,7 +39,7 @@ def main(controller):
     uav_1, uav_2 = init_two_uavs(controller)
 
     
-    nfc2 = NonlinearFeedbackController()
+    nfc2 = NonlinearFeedbackController3()
     yaw_uav_1 = 4.71238898038469
     yaw_uav_2 = 1.570796326794897 #* 180.0/np.pi
 
@@ -60,11 +60,11 @@ def main(controller):
     curr_sim_time = 0.0
     curr_step = 0
 
-    target_velocity = 1.0
-    planner = Planner(velocity=target_velocity, acceleration_time=5.0, dt=0.005,
-                      start=(0.0,-2.5,-1.5), end=(0.0,5.0,-1.5), hover_time=5.0, 
+    target_velocity = 1.7
+    planner = Planner(velocity=target_velocity, acceleration_time=1.5, dt=0.005,
+                      start=(0.0,-2.5,-1.5), end=(0.0,7.0,-1.5), hover_time=10.0, 
                       initial_yaw=yaw_uav_2, traj_type=0)
-    #planner.plot_trajectory_2d()
+    planner.plot_trajectory_2d()
     #exit(0)
     current_waypoint = planner.pop_waypoint(np.zeros(9), alpha=1.0)
 
@@ -106,8 +106,8 @@ def main(controller):
     while curr_sim_time < SIM_MAX_DURATION:
 
         if curr_sim_time < HOVER_DURATION:
-            px4_input_1 = (0.0, -2.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan)
-            px4_input_2 = (0.0, 0.0, -5.0, -0.8, nan, nan, nan, nan, nan, nan, yaw_uav_2, nan)
+            px4_input_1 = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan)
+            px4_input_2 = (0.0, 0.0, -2.5, -1.5, nan, nan, nan, nan, nan, nan, yaw_uav_2, nan)
             reply = controller.simulate(steps_per_call,  { uav_1.px4_idx: px4_input_1, uav_2.px4_idx: px4_input_2 })
             curr_sim_time += steps_per_call * time_step
             curr_step += steps_per_call
@@ -125,7 +125,7 @@ def main(controller):
         #feedforward = ndp_feedforward # enable alternative predictor
         feedforward_forces_z.append(feedforward[2])
         uav_thrust_forces.append(uav_xyz_force)
-        feedforward = np.zeros(3) # distable feedforward term
+        feedforward = np.zeros(3) # disable feedforward term
 
         
         px4_input_2 = nfc2.nonlinear_feedback_qt_px4(desired_waypoint, feedforward)
@@ -161,15 +161,15 @@ def main(controller):
         positions2.append(pos2); velocities2.append(vel2); planned_pos2.append(current_waypoint)
         positions1.append(pos1); velocities1.append(vel1); planned_pos1.append(np.zeros(10))
 
-        if np.linalg.norm(np.array(pos2[1]) - np.array(pos1[1]))<0.7:
+        if np.linalg.norm(np.array(pos2[1]) - np.array(pos1[1]))<1.2:
             #nfc2.s_int = np.zeros(3)
-            uav_1.states[-1][0] += 2.0
+            #uav_1.states[-1][0] += 2.0
             feedforward = predictor.evaluate(np.array(uav_1.states[-1]).reshape(1,-1), np.array(uav_2.states[-1]).reshape(1,-1))[0]
 
             #feedforward = predictor.evaluate(np.array(uav_1.states[-1]).reshape(1,-1), np.array(uav_2.states[-1]).reshape(1,-1))[0]
             ndp_feedforward = ndp_predictor.evaluate(np.array(uav_2.states[-1])[:6] - np.array(uav_1.states[-1])[:6])
 
-            #feedforward *= 0.7
+            #feedforward *= 0.8
             #feedforward -= np.array([0.0,-5.0,0.0]) # add y error
             print("################### ############")
             print("FEEDFORWARD:", ndp_feedforward)
@@ -178,7 +178,7 @@ def main(controller):
 
 
         # check if current target already reached
-        if np.linalg.norm(np.array(pos2[:2]) - current_waypoint[:2])<0.25:
+        if np.linalg.norm(np.array(pos2[:2]) - current_waypoint[:2])<0.35:
             current_waypoint = planner.pop_waypoint(uav_2.states[-1][:9])
             
 
@@ -190,6 +190,7 @@ def main(controller):
         
         
         # advance timer and step counter:
+        print("t:", np.round(curr_sim_time,3))
         curr_sim_time += steps_per_call * time_step
         curr_step += steps_per_call
 

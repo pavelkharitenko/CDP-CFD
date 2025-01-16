@@ -10,7 +10,7 @@ sys.path.append('../../../observers/')
 
 from agile.model import AgileShallowPredictor
 from ndp.model import DWPredictor
-from controller import NonlinearFeedbackController
+from controller2 import NonlinearFeedbackController2
 from planner import Planner
 
 from scipy.spatial.transform import Rotation as R
@@ -27,7 +27,7 @@ def main(controller):
     nan = float('NaN')
 
     # exp specific
-    SIM_MAX_DURATION = 17.0
+    SIM_MAX_DURATION = 18.0
     HOVER_DURATION = 0.0
     
     
@@ -39,9 +39,12 @@ def main(controller):
     uav_1, uav_2 = init_two_uavs(controller)
 
     
-    nfc2 = NonlinearFeedbackController()
+    nfc2 = NonlinearFeedbackController2()
     yaw_uav_1 = 4.71238898038469
     yaw_uav_2 = 1.570796326794897 #* 180.0/np.pi
+    #yaw_uav_2 = 0.0 #* 180.0/np.pi
+
+
 
     
     # Start simulation
@@ -61,10 +64,10 @@ def main(controller):
     curr_step = 0
 
     target_velocity = 1.0
-    planner = Planner(velocity=target_velocity, acceleration_time=5.0, dt=0.005,
-                      start=(0.0,-2.5,-1.5), end=(0.0,5.0,-1.5), hover_time=5.0, 
-                      initial_yaw=yaw_uav_2, traj_type=0)
-    #planner.plot_trajectory_2d()
+    planner = Planner(velocity=target_velocity, acceleration_time=3.0, dt=0.005,
+                      start=(0.0,-7.5,-2.25), end=(0.0,5.0,-2.25), hover_time=6.0, 
+                      initial_yaw=yaw_uav_2, traj_type=2)
+    #planner.plot_trajectory()
     #exit(0)
     current_waypoint = planner.pop_waypoint(np.zeros(9), alpha=1.0)
 
@@ -74,6 +77,7 @@ def main(controller):
     predictor.load_state_dict(torch.load(find_file_with_substring("upbeat-elk30"), weights_only=True))
 
     ndp_predictor = DWPredictor()
+    #ndp_predictor.load_state_dict(torch.load(find_file_with_substring("adaptive-partition20"), weights_only=True))
     ndp_predictor.load_state_dict(torch.load(find_file_with_substring("adaptive-partition20"), weights_only=True))
 
 
@@ -163,11 +167,12 @@ def main(controller):
 
         if np.linalg.norm(np.array(pos2[1]) - np.array(pos1[1]))<0.7:
             #nfc2.s_int = np.zeros(3)
-            uav_1.states[-1][0] += 2.0
+            #uav_2.states[-1][1] += +0.3
             feedforward = predictor.evaluate(np.array(uav_1.states[-1]).reshape(1,-1), np.array(uav_2.states[-1]).reshape(1,-1))[0]
 
             #feedforward = predictor.evaluate(np.array(uav_1.states[-1]).reshape(1,-1), np.array(uav_2.states[-1]).reshape(1,-1))[0]
-            ndp_feedforward = ndp_predictor.evaluate(np.array(uav_2.states[-1])[:6] - np.array(uav_1.states[-1])[:6])
+            ndp_feedforward = ndp_predictor.evaluate(
+                np.array(uav_2.states[-1])[:6].reshape(1,-1) - np.array(uav_1.states[-1])[:6].reshape(1,-1))[0]
 
             #feedforward *= 0.7
             #feedforward -= np.array([0.0,-5.0,0.0]) # add y error

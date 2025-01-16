@@ -1864,7 +1864,8 @@ def compute_trajectory_errors(actual_positions, actual_velocities, planned_posit
 
 def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_uav1, actual_velocities_uav1, 
                                       actual_positions_uav2, planned_positions_uav2, actual_velocities_uav2, 
-                                      ignore_start=0, ignore_end=0, feedforward=[]):
+                                      ignore_start=0, ignore_end=0, feedforward=[], uav_actual_fz = [], uav_f_u = [],
+                                      nf_forces_z = []):
     """
     Used to plot tracking errors, velocities, and relative distances of two UAVs.
     """
@@ -1903,8 +1904,10 @@ def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_u
     
     # Relative XY Distance Plot
     sns.lineplot(x=np.arange(len(rel_xy_distances)), y=rel_xy_distances, ax=axes[2, 0], label='Rel. XY Dist.', color='cyan')
+    # plot additional info
     if len(feedforward) > 0:
-        sns.lineplot(x=np.arange(len(feedforward)), y=feedforward*0.1, ax=axes[2, 0], label='Predicted Z-force', color='magenta')
+        sns.lineplot(x=np.arange(len(feedforward)), y=feedforward*0.1, ax=axes[2, 0], label='predictors Z-force', color='magenta')
+    
 
     axes[2, 0].set_title('Relative XY Distance between UAV1 and UAV2')
     axes[2, 0].set_ylabel('Distance (m) and Feedforward forces from predictor')
@@ -1979,3 +1982,86 @@ def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_u
 
     plt.tight_layout()
     plt.show()
+
+
+def analyze_forces(uav_forces, thrust_forces, predictor_forces_z, nfc_forces, dt):
+    """
+    Plots two subplots with y-data and calculated x-data based on time step.
+    - dt: time step in seconds
+    """
+
+    # 1) display uav z-force, controller z-force, residual z-force (downwash), and predictors z-force
+
+    
+    #print(thrust_forces)
+    uav_x_forces = [force[0] for force in uav_forces]
+    uav_y_forces = [force[1] for force in uav_forces]
+    uav_z_forces = [force[2] for force in uav_forces]
+
+    uav_x_thrust = np.array([thrust[0] for thrust in thrust_forces])
+    uav_y_thrust = np.array([thrust[1] for thrust in thrust_forces])
+    uav_z_thrust = np.array([thrust[2] for thrust in thrust_forces])
+    uav_z_thrust -= 9.81*3.3035
+
+    smoothed_uav_x_forces = smooth_with_savgol(uav_x_forces, window_size=31, poly_order=1)
+    smoothed_uav_y_forces = smooth_with_savgol(uav_y_forces, window_size=31, poly_order=1)
+    smoothed_uav_z_forces = smooth_with_savgol(uav_z_forces, window_size=31, poly_order=1)
+
+    uav_x_dw_forces = smoothed_uav_x_forces - uav_x_thrust
+    uav_y_dw_forces = smoothed_uav_y_forces - uav_y_thrust
+    uav_z_dw_forces = smoothed_uav_z_forces - uav_z_thrust
+
+
+
+    # Calculate x-data based on time step
+    x = np.arange(len(uav_z_forces)) * dt
+    
+
+    # Create figure and subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+
+    # Plot curves in the first subplot
+    
+    ax1.plot(x, uav_z_forces, label=f'UAV z-forces')
+    ax1.plot(x, uav_z_thrust, label=f'thrust z-forces')
+    ax1.plot(x, uav_z_dw_forces, label=f'z-downwash force')
+    ax1.plot(x, predictor_forces_z, label=f'predicted z-force')
+    ax1.plot(x, [force[2] - 9.81*3.3035 for force in nfc_forces], label=f'NFC z-force')
+
+
+
+    #ax1.plot(x, uav_y_forces, label=f'UAV y-forces')
+    #ax1.plot(x, uav_z_forces, label=f'UAV z-forces')
+
+    ax1.set_title('First Subplot with Multiple Curves')
+    ax1.set_xlabel('Time (seconds)')
+    ax1.set_ylabel('Y-axis Label 1')
+    ax1.legend()
+    ax1.grid(True)
+
+    # Plot curves in the second subplot
+   
+    ax2.plot(x, uav_x_dw_forces, label=f'x-force downwash')
+    ax2.plot(x, uav_y_dw_forces, label=f'y-force downwash')
+
+    ax2.set_title('Second Subplot with Multiple Curves')
+    ax2.set_xlabel('Time (seconds)')
+    ax2.set_ylabel('Y-axis Label 2')
+    ax2.legend()
+    ax2.grid(True)
+
+    # Adjust layout and show plot
+    plt.tight_layout()
+    plt.show()
+
+def get_thrust_xyz_forces(uav_state):
+    """
+    Returns thrust vector of uav as forces in xyz-axes of world
+    """
+    avg_rps_u2 = np.mean(np.abs(uav_state[22:26]))
+    yaw_pitch_roll = uav_state[9:12]
+    u2_rot = R.from_euler('xyz', [yaw_pitch_roll[2], yaw_pitch_roll[1], yaw_pitch_roll[0]], degrees=False)
+        
+    uav_xyz_forces = u2_rot.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps_u2)])
+    
+    return uav_xyz_forces
