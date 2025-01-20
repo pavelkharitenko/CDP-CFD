@@ -29,8 +29,8 @@ class NonlinearFeedbackController3:
         #self.M = np.eye(3) * self.uav_mass
         self.G = self.uav_mass * np.array([0, 0, self.g])
 
-        self.k_p = np.array([3.0,3.0, 32.0]) #np.array([3.0,3.0, 18.0]) 
-        self.k_v = np.array([3.0,3.0, 27.0]) #np.array([3.0,3.0, 15.0]) 
+        self.k_p = np.array([2.0,2.0, 32.0]) #np.array([3.0,3.0, 18.0]) 
+        self.k_v = np.array([2.0,2.0, 27.0]) #np.array([3.0,3.0, 15.0]) 
 
         
         
@@ -66,6 +66,15 @@ class NonlinearFeedbackController3:
         
 
         f_des = m*a_fb + m*a_r + self.G - f_ext
+
+        # advanced feedforward:
+        #f_des = m*a_fb + m*a_r + self.G
+        #f_des_z = f_ext[2]* -1.0
+        #print("F_res", f_des_z)
+        #print("F_des", f_des[2])
+
+        #f_des = np.array([f_des[0], f_des[1], f_des[2] + np.clip(f_des_z - f_des[2], 0, f_des_z)])
+        #print("F_des + Fres", f_des[2])
 
         
         return f_des

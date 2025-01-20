@@ -12,7 +12,7 @@
         initial_position:
         - 0.0
         - 0.0
-        - 0.0
+        - -0.8
         initial_rotation:
           angle_radians: 4.71238898038469
           axis:
@@ -33,7 +33,7 @@
         initial_position:
         - 0
         - -2.5
-        - -1.5
+        - -1.6
         initial_rotation:
           angle_radians: 1.570796326794897
           axis:
@@ -42,13 +42,13 @@
           - 1.0
         joint_velocities:
           p600__rotor_0_joint:
-            - 350.0
+            - 359.0
           p600__rotor_1_joint:
-            - 350.0
+            - 359.0
           p600__rotor_2_joint:
-            - -350.0
+            - -359.0
           p600__rotor_3_joint:
-            - -350.0
+            - -359.0
     
   fluid:
     blocks:

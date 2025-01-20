@@ -27,7 +27,7 @@ def main(controller):
     nan = float('NaN')
 
     # exp specific
-    SIM_MAX_DURATION = 16.0
+    SIM_MAX_DURATION = 18.0
     HOVER_DURATION = 0.0
     
     
@@ -60,10 +60,14 @@ def main(controller):
     curr_sim_time = 0.0
     curr_step = 0
 
-    target_velocity = 1.7
-    planner = Planner(velocity=target_velocity, acceleration_time=1.5, dt=0.005,
-                      start=(0.0,-2.5,-1.5), end=(0.0,7.0,-1.5), hover_time=10.0, 
-                      initial_yaw=yaw_uav_2, traj_type=0)
+    target_velocity = 2.8
+    acceleration_time = 2.0
+    hover_time = 10.0
+    planner = Planner(velocity=target_velocity, acceleration_time=acceleration_time, dt=0.005, hover_time=hover_time, 
+                      start=(0.0,-2.5,-1.5), 
+                      end=(0.0,7.0,-1.5), 
+                      initial_yaw=yaw_uav_2, 
+                      traj_type=0)
     planner.plot_trajectory_2d()
     #exit(0)
     current_waypoint = planner.pop_waypoint(np.zeros(9), alpha=1.0)
@@ -98,7 +102,7 @@ def main(controller):
     ndp_feedforward = np.zeros(3)
 
 
-    px4_input_1 = (0.0,0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan) # uav 1 hover at (0,0,0)
+    px4_input_1 = (0.0,0.0, 0.0, -1.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan) # uav 1 hover at (0,0,0)
     
 
 
@@ -113,9 +117,7 @@ def main(controller):
             curr_step += steps_per_call
             continue
 
-        print("EXECUTED -------------")
-
-            
+        print("-------------")
 
 
         desired_waypoint, desired_yaw = current_waypoint[:9], current_waypoint[9]
@@ -180,15 +182,12 @@ def main(controller):
         # check if current target already reached
         if np.linalg.norm(np.array(pos2[:2]) - current_waypoint[:2])<0.35:
             current_waypoint = planner.pop_waypoint(uav_2.states[-1][:9])
-            
 
 
         rel_state_vector_uav_2 = np.round(np.array(uav_1.states[-1]) - np.array(uav_2.states[-1]), 3)
-        #print("Rel. state vec.:", rel_state_vector_uav_2)
         rel_state_vector_list.append(rel_state_vector_uav_2)
+        
 
-        
-        
         # advance timer and step counter:
         print("t:", np.round(curr_sim_time,3))
         curr_sim_time += steps_per_call * time_step
@@ -210,11 +209,11 @@ def main(controller):
                                       np.array(positions2), np.array(planned_pos2), np.array(velocities2), 
                                       feedforward=np.array(feedforward_forces_z))
     
-    analyze_forces(uav_forces=uav_actual_forces, 
-                   thrust_forces=uav_thrust_forces, 
-                   predictor_forces_z=feedforward_forces_z, 
-                   nfc_forces=nf_actual_forces,
-                   
+    plot_uav_positions_and_errors(np.array(positions1),np.array(positions2), target_positions1=np.array(planned_pos1)[:,:3],
+                                  target_positions2=np.array(planned_pos2)[:,:3], dt=nfc2.dt)
+    
+    analyze_forces(uav_forces=uav_actual_forces, thrust_forces=uav_thrust_forces, 
+                   predictor_forces_z=feedforward_forces_z, nfc_forces=nf_actual_forces,
                    dt=nfc2.dt)
 
 controller = None

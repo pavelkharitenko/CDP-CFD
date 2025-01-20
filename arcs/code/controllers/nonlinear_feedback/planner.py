@@ -5,7 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D
 class Planner:
     def __init__(self, start=(0.0, 0.0, 0.0), end=(5.0, 0.0, 0.0), 
                 dt=0.1, velocity=0.3, acceleration_time=1.0, hover_time=0.0, 
-                radius=2.0, traj_type=0, initial_yaw=0.0):
+                radius=2.5, traj_type=0, initial_yaw=0.0):
         self.start = np.array(start)
         self.end = np.array(end)
         self.dt = dt

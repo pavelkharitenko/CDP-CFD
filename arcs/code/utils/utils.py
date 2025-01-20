@@ -1864,12 +1864,11 @@ def compute_trajectory_errors(actual_positions, actual_velocities, planned_posit
 
 def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_uav1, actual_velocities_uav1, 
                                       actual_positions_uav2, planned_positions_uav2, actual_velocities_uav2, 
-                                      ignore_start=0, ignore_end=0, feedforward=[], uav_actual_fz = [], uav_f_u = [],
-                                      nf_forces_z = []):
+                                      ignore_start=0, ignore_end=0, feedforward=[]):
     """
     Used to plot tracking errors, velocities, and relative distances of two UAVs.
     """
-    overlap_threshold = 0.6
+    overlap_threshold = 1.0
     sns.set(style="whitegrid")
     plt.rcParams.update({'font.size': 10})  # Smaller font size
 
@@ -1882,6 +1881,15 @@ def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_u
                                (actual_positions_uav1[:, 1] - actual_positions_uav2[:, 1])**2)
     rel_xy_distances = rel_xy_distances[ignore_start:len(rel_xy_distances)-ignore_end] if ignore_end > 0 else rel_xy_distances[ignore_start:]
     overlap_indices = np.where(rel_xy_distances < overlap_threshold)[0]
+
+    actual_positions_uav1 = actual_positions_uav1[ignore_start:]
+    actual_positions_uav2 = actual_positions_uav2[ignore_start:]
+    actual_velocities_uav1 = actual_velocities_uav1[ignore_start:]
+    actual_velocities_uav2 = actual_velocities_uav2[ignore_start:]
+
+
+    if len(overlap_indices) == 0:
+        overlap_indices = [len(rel_xy_distances)-1]
 
     fig, axes = plt.subplots(3, 2, figsize=(18, 25))
 
@@ -1906,6 +1914,7 @@ def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_u
     sns.lineplot(x=np.arange(len(rel_xy_distances)), y=rel_xy_distances, ax=axes[2, 0], label='Rel. XY Dist.', color='cyan')
     # plot additional info
     if len(feedforward) > 0:
+        feedforward = feedforward[ignore_start:]
         sns.lineplot(x=np.arange(len(feedforward)), y=feedforward*0.1, ax=axes[2, 0], label='predictors Z-force', color='magenta')
     
 
@@ -1938,43 +1947,54 @@ def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_u
     avg_overlap_vel_errors_uav1 = np.mean(np.abs(vel_err_uav1[overlap_indices]), axis=0)
     avg_overlap_vel_errors_uav2 = np.mean(np.abs(vel_err_uav2[overlap_indices]), axis=0)
 
+    max_overlap_pos_errors_uav1 = np.max(np.abs(pos_err_uav1[overlap_indices]), axis=0)
+    max_overlap_pos_errors_uav2 = np.max(np.abs(pos_err_uav2[overlap_indices]), axis=0)
+    max_overlap_vel_errors_uav1 = np.max(np.abs(vel_err_uav1[overlap_indices]), axis=0)
+    max_overlap_vel_errors_uav2 = np.max(np.abs(vel_err_uav2[overlap_indices]), axis=0)
+
     # Colors corresponding to axes
-    colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow']
+    colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'orange']
 
     # Bar plots for position errors
-    x_labels = ['U1 X Pos Err.', 'U1 Y Pos Err.', 'U1 Z Pos Err.', 'U2 X Pos Err.', 'U2 Y Pos Err.', 'U2 Z Pos Err.']
+    x_labels = ['U1 Px err.', 'U1 Py Err.', 'U1 Pz err.', 'U2 Px err.', 'U2 Py err.', 'U2 Pz err.']
     avg_errors = np.concatenate((avg_pos_errors_uav1, avg_pos_errors_uav2))
     avg_overlap_errors = np.concatenate((avg_overlap_pos_errors_uav1, avg_overlap_pos_errors_uav2))
     max_errors = np.concatenate((max_pos_errors_uav1, max_pos_errors_uav2))
+    max_overlap_errors = np.concatenate((max_overlap_pos_errors_uav1, max_overlap_pos_errors_uav2))
 
     x = np.arange(len(x_labels))
-    width = 0.1  # Width of individual bars in triplets
+    width = 0.2  # Width of individual bars in triplets
 
     for i in range(len(x_labels)):
-        axes[1, 1].bar(x[i] - width, avg_errors[i], width, label='Avg Error' if i == 0 else "", color=colors[i % 3])
-        axes[1, 1].bar(x[i], avg_overlap_errors[i], width, label='Avg Overlap Error' if i == 0 else "", color=colors[i % 3])
-        axes[1, 1].bar(x[i] + width, max_errors[i], width, label='Max Error' if i == 0 else "", color=colors[i % 3])
+        axes[1, 1].bar(x[i] - width, avg_errors[i], width, label='Avg Error' if i == 0 else "", color=colors[i % 4])
+        axes[1, 1].bar(x[i] - 0.5*width, max_errors[i], width, label='Max Error' if i == 0 else "", color=colors[i % 4])
+        axes[1, 1].bar(x[i] + 0.5* width, avg_overlap_errors[i], width, label='Avg Overlap Error' if i == 0 else "", color=colors[i % 4])
+        axes[1, 1].bar(x[i] + width, max_overlap_errors[i], width, label='Max Overlap' if i == 0 else "", color=colors[i % 4])
+
         
-    axes[1, 1].set_title('Position Errors (Avg., avg. overlap, max. recorded error)')
+    axes[1, 1].set_title('Position Errors: Avg., Max., Avg (overlap) Max. (overlap)')
     axes[1, 1].set_ylabel('Error (m)')
     axes[1, 1].set_xticks(x)
     axes[1, 1].set_xticklabels(x_labels)
     
 
     # Bar plots for velocity errors
-    x_labels = ['U1 X Vel Err.', 'U1 Y Vel Err.', 'U1 Z Vel Err.', 'U2 X Vel Err.', 'U2 Y Vel Err.', 'U2 Z Vel Err.']
+    x_labels = ['U1 Vx err.', 'U1 Vy err.', 'U1 Vz err.', 'U2 Vx err.', 'U2 Vy err.', 'U2 Vz err.']
     avg_errors = np.concatenate((avg_vel_errors_uav1, avg_vel_errors_uav2))
-    avg_overlap_errors = np.concatenate((avg_overlap_vel_errors_uav1, avg_overlap_vel_errors_uav2))
     max_errors = np.concatenate((max_vel_errors_uav1, max_vel_errors_uav2))
+    avg_overlap_errors = np.concatenate((avg_overlap_vel_errors_uav1, avg_overlap_vel_errors_uav2))
+    max_overlap_errors = np.concatenate((max_overlap_vel_errors_uav1, max_overlap_vel_errors_uav2))
 
     x = np.arange(len(x_labels))
 
     for i in range(len(x_labels)):
-        axes[2, 1].bar(x[i] - width, avg_errors[i], width, label='Avg Error' if i == 0 else "", color=colors[i % 3])
-        axes[2, 1].bar(x[i], avg_overlap_errors[i], width, label='Avg Overlap Error' if i == 0 else "", color=colors[i % 3])
-        axes[2, 1].bar(x[i] + width, max_errors[i], width, label='Max Error' if i == 0 else "", color=colors[i % 3])
+        axes[2, 1].bar(x[i] - width, avg_errors[i], width, label='Avg Error' if i == 0 else "", color=colors[i % 4])
+        axes[2, 1].bar(x[i] -0.5* width, max_errors[i], width, label='Max Error' if i == 0 else "", color=colors[i % 4])
+        axes[2, 1].bar(x[i] + 0.5* width, avg_overlap_errors[i], width, label='Avg Overlap Error' if i == 0 else "", color=colors[i % 4])
+        axes[2, 1].bar(x[i] + width, max_overlap_errors[i], width, label='Max Overlap Error' if i == 0 else "", color=colors[i % 4])
+
         
-    axes[2, 1].set_title('Velocity Errors (Avg., avg. overlap, max. recorded error)')
+    axes[2, 1].set_title('Velocity Errors: Avg., Max., Avg (overlap) Max. (overlap)')
     axes[2, 1].set_ylabel('Error (m/s)')
     axes[2, 1].set_xticks(x)
     axes[2, 1].set_xticklabels(x_labels)
@@ -2065,3 +2085,101 @@ def get_thrust_xyz_forces(uav_state):
     uav_xyz_forces = u2_rot.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps_u2)])
     
     return uav_xyz_forces
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_uav_positions_and_errors(uav1_positions, uav2_positions, target_positions1,target_positions2, dt):
+    """
+    Plot the xyz positions of two UAVs on multiple subplots, position vs. time, and error vs. time.
+    
+    Parameters:
+    - uav1_positions: List of (x, y, z) positions for UAV 1.
+    - uav2_positions: List of (x, y, z) positions for UAV 2.
+    - target_positions: List of (x, y, z) target positions.
+    - dt: Time step in seconds.
+    """
+    uav1_positions = np.array(uav1_positions)
+    uav2_positions = np.array(uav2_positions)
+    target_positions = np.array(target_positions2)
+    
+    time = np.arange(len(uav1_positions)) * dt
+    
+    uav1_errors = uav1_positions - target_positions1
+    uav2_errors = uav2_positions - target_positions2
+
+    # Create figure and subplots for position plots
+    fig, axs = plt.subplots(3, 3, figsize=(15, 12))
+    
+    # XY, YZ, XZ plots for UAV 1 and UAV 2
+    axs[0, 0].plot(uav1_positions[:, 0], uav1_positions[:, 1], label='UAV 1')
+    axs[0, 0].plot(uav2_positions[:, 0], uav2_positions[:, 1], label='UAV 2')
+    axs[0, 0].set_title('XY Position')
+    axs[0, 0].set_xlabel('X Position')
+    axs[0, 0].set_ylabel('Y Position')
+    axs[0, 0].legend()
+    axs[0, 0].grid(True)
+
+    axs[0, 1].plot(uav1_positions[:, 1], uav1_positions[:, 2], label='UAV 1')
+    axs[0, 1].plot(uav2_positions[:, 1], uav2_positions[:, 2], label='UAV 2')
+    axs[0, 1].set_title('YZ Position')
+    axs[0, 1].set_xlabel('Y Position')
+    axs[0, 1].set_ylabel('Z Position')
+    axs[0, 1].legend()
+    axs[0, 1].grid(True)
+
+    axs[0, 2].plot(uav1_positions[:, 0], uav1_positions[:, 2], label='UAV 1')
+    axs[0, 2].plot(uav2_positions[:, 0], uav2_positions[:, 2], label='UAV 2')
+    axs[0, 2].set_title('XZ Position')
+    axs[0, 2].set_xlabel('X Position')
+    axs[0, 2].set_ylabel('Z Position')
+    axs[0, 2].legend()
+    axs[0, 2].grid(True)
+
+    # X, Y, Z positions and target positions over time
+    axs[1, 0].plot(time, uav1_positions[:, 0], label='UAV 1 X')
+    axs[1, 0].plot(time, uav2_positions[:, 0], label='UAV 2 X')
+    axs[1, 0].plot(time, target_positions[:, 0], label='Target X', linestyle='--')
+    axs[1, 0].set_title('X Position Over Time')
+    axs[1, 0].set_xlabel('Time (seconds)')
+    axs[1, 0].set_ylabel('X Position')
+    axs[1, 0].legend()
+    axs[1, 0].grid(True)
+
+    axs[1, 1].plot(time, uav1_positions[:, 1], label='UAV 1 Y')
+    axs[1, 1].plot(time, uav2_positions[:, 1], label='UAV 2 Y')
+    axs[1, 1].plot(time, target_positions[:, 1], label='Target Y', linestyle='--')
+    axs[1, 1].set_title('Y Position Over Time')
+    axs[1, 1].set_xlabel('Time (seconds)')
+    axs[1, 1].set_ylabel('Y Position')
+    axs[1, 1].legend()
+    axs[1, 1].grid(True)
+
+    axs[1, 2].plot(time, uav1_positions[:, 2], label='UAV 1 Z')
+    axs[1, 2].plot(time, uav2_positions[:, 2], label='UAV 2 Z')
+    axs[1, 2].plot(time, target_positions[:, 2], label='Target Z', linestyle='--')
+    axs[1, 2].set_title('Z Position Over Time')
+    axs[1, 2].set_xlabel('Time (seconds)')
+    axs[1, 2].set_ylabel('Z Position')
+    axs[1, 2].legend()
+    axs[1, 2].grid(True)
+
+    # Errors over time for X, Y, Z
+    axs[2, 0].plot(time, uav1_errors[:, 0], label='UAV 1 X Error')
+    axs[2, 0].plot(time, uav2_errors[:, 0], label='UAV 2 X Error')
+    axs[2, 0].plot(time, uav1_errors[:, 1], label='UAV 1 Y Error')
+    axs[2, 0].plot(time, uav2_errors[:, 1], label='UAV 2 Y Error')
+    axs[2, 0].plot(time, uav1_errors[:, 2], label='UAV 1 Z Error')
+    axs[2, 0].plot(time, uav2_errors[:, 2], label='UAV 2 Z Error')
+    axs[2, 0].set_title('Position Errors Over Time')
+    axs[2, 0].set_xlabel('Time (seconds)')
+    axs[2, 0].set_ylabel('Error')
+    axs[2, 0].legend()
+    axs[2, 0].grid(True)
+
+    # Hide unused subplots
+    axs[2, 1].axis('off')
+    axs[2, 2].axis('off')
+
+    plt.tight_layout()
+    plt.show()
