@@ -102,7 +102,7 @@ def main(controller):
     ndp_feedforward = np.zeros(3)
 
 
-    px4_input_1 = (0.0,0.0, 0.0, -1.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan) # uav 1 hover at (0,0,0)
+    px4_input_1 = (0.0,0.0, 0.0, 0.5, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan) # uav 1 hover at (0,0,0)
     
 
 

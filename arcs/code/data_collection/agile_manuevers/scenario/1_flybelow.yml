@@ -12,7 +12,7 @@
         initial_position:
         - 0.0
         - 0.0
-        - -0.8
+        - 0.0 #-0.8
         initial_rotation:
           angle_radians: 4.71238898038469
           axis:
