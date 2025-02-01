@@ -22,7 +22,7 @@ load_model = None
 #torch.manual_seed(seed)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 30
+n_epochs = 50
 
 lr = 1e-4
 #sn_gamma = 4 # scale factor for spectral normalization
@@ -107,8 +107,6 @@ def evaluate_nn(model, eval_loader):
 def train():
 
     # test data:
-    # list of tuples: ([px,py,pz, vx,vy,vz], [fx,fy,fz]) 
-    # other vehicle - ego vehicle: [0,0,1]->[0,0,-6.5]
 
     exp_name = init_experiment(model_name)
 
@@ -121,12 +119,13 @@ def train():
     ])
     
     dataset_eval = AgileContinousDataset([
-
         find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz"),
         find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz"),
         find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz"),
         find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len20802ts_67_iterations_testset.npz"),
     ])
+
+    
 
     # Data preparation
     # Number of timesteps to look back
@@ -162,7 +161,7 @@ def train():
         model = AgileShallowPredictor().to(device)
         model.load_state_dict(torch.load(load_model, weights_only=True))
     else:
-        model = AgileShallowPredictor().to(device)
+        model = AgileShallowPredictor(output_dim=3).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
     loss_fn = torch.nn.MSELoss()
@@ -206,7 +205,7 @@ def train():
     # Plot results
     plt.figure(figsize=(10, 6))
     plt.plot(actuals, label="True Forces", linewidth=2)
-    plt.plot(predictions, label="Predicted Forces (NNARX)", linewidth=2, linestyle="--")
+    plt.plot(predictions, label="Predicted Forces", linewidth=2, linestyle="--")
     plt.xlabel("Time Step")
     plt.ylabel("Force")
     plt.title("True vs Predicted Disturbance Forces")

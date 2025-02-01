@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from scipy.interpolate import CubicSpline
+from scipy.signal import savgol_filter
 
 class Planner:
     def __init__(self, start=(0.0, 0.0, 0.0), end=(5.0, 0.0, 0.0), 
@@ -23,6 +25,12 @@ class Planner:
             self.trajectory = self._generate_circle_trajectory()
         elif self.traj_type == 2:
             self.trajectory = self._generate_horizontal_circle_trajectory()
+        elif self.traj_type == 3:
+            self.trajectory = self._generate_tilted_circle_trajectory_2()
+        elif self.traj_type == 4:
+            self.trajectory = self._generate_tilted_circle_trajectory_reversed()
+        elif self.traj_type == 5:
+            self.trajectory = self._generate_spiral_trajectory()
     
     def _generate_hover_waypoints(self):
         num_hover_points = int(self.hover_time / self.dt)
@@ -131,7 +139,247 @@ class Planner:
         full_trajectory = np.array(hover_waypoints + trajectory)
         
         return full_trajectory
+   
     
+    
+
+
+    def _generate_tilted_circle_trajectory(self):
+        # Define waypoints relative to the starting position
+        relative_waypoints = [
+            np.array([0, 0, 0]),
+            np.array([-1.5, 1.5, -0.75]),
+            np.array([-3, 0, 0]),
+            np.array([-1.5, -1.5, 0.75]),
+            np.array([0, 0, 0])  # Complete the loop back to start
+        ]
+        
+        # Offset the waypoints by the starting position
+        waypoints = np.array([self.start + wp for wp in relative_waypoints])
+        
+        # Number of points to interpolate along the curve
+        total_points = int(len(waypoints) * 1 / self.dt)
+        
+        # Generate smooth spline for x, y, z
+        t_waypoints = np.linspace(0, 1, len(waypoints))  # Parameter for the waypoints
+        t_spline = np.linspace(0, 1, total_points)      # Fine-grained parameter for the trajectory
+        
+        spline_x = CubicSpline(t_waypoints, waypoints[:, 0], bc_type='periodic')
+        spline_y = CubicSpline(t_waypoints, waypoints[:, 1], bc_type='periodic')
+        spline_z = CubicSpline(t_waypoints, waypoints[:, 2], bc_type='periodic')
+        
+        # Generate smooth positions
+        smooth_positions = np.stack([spline_x(t_spline), spline_y(t_spline), spline_z(t_spline)], axis=-1)
+        
+        # Compute velocities and accelerations from the splines
+        raw_velocities = np.stack([spline_x(t_spline, 1), spline_y(t_spline, 1), spline_z(t_spline, 1)], axis=-1)
+        raw_accelerations = np.stack([spline_x(t_spline, 2), spline_y(t_spline, 2), spline_z(t_spline, 2)], axis=-1)
+        
+        # Apply smoothing to velocities and accelerations
+        smooth_velocities = savgol_filter(raw_velocities, window_length=51, polyorder=3, axis=0)  # Adjust window length
+        smooth_accelerations = savgol_filter(raw_accelerations, window_length=51, polyorder=3, axis=0)
+
+        # Clip velocities to ensure they don't exceed the desired maximum velocity
+        velocity_magnitudes = np.linalg.norm(smooth_velocities, axis=1)
+        scale_factors = np.minimum(1, self.velocity / np.maximum(velocity_magnitudes, 1e-5))
+        smooth_velocities = (smooth_velocities.T * scale_factors).T
+        
+        # Recalculate accelerations to match adjusted velocities
+        smooth_accelerations = np.gradient(smooth_velocities, self.dt, axis=0)
+        
+        # Compute yaw angles based on forward direction
+        forward_directions = np.diff(smooth_positions, axis=0, prepend=smooth_positions[0:1])
+        yaw_angles = np.arctan2(forward_directions[:, 1], forward_directions[:, 0])
+        
+        # Combine position, velocity, acceleration, and yaw into the trajectory
+        trajectory = [
+            np.array([*pos, *vel, *acc, yaw])
+            for pos, vel, acc, yaw in zip(smooth_positions, smooth_velocities, smooth_accelerations, yaw_angles)
+        ]
+        
+        hover_waypoints = self._generate_hover_waypoints()
+        return np.array(hover_waypoints + trajectory)
+
+
+    def _generate_tilted_circle_trajectory_reversed(self):
+        # Define waypoints relative to the starting position
+        relative_waypoints = [
+            np.array([0, 0, 0]),
+            np.array([1.5, 1.5, 0.75]),
+            np.array([3, 0, 0]),
+            np.array([1.5, -1.5, -0.75]),
+            np.array([0, 0, 0])  # Complete the loop back to start
+        ]
+        
+        # Offset the waypoints by the starting position
+        waypoints = np.array([self.start + wp for wp in relative_waypoints])
+        
+        # Number of points to interpolate along the curve
+        total_points = int(len(waypoints) * 1 / self.dt)
+        
+        # Generate smooth spline for x, y, z
+        t_waypoints = np.linspace(0, 1, len(waypoints))  # Parameter for the waypoints
+        t_spline = np.linspace(0, 1, total_points)      # Fine-grained parameter for the trajectory
+        
+        spline_x = CubicSpline(t_waypoints, waypoints[:, 0], bc_type='periodic')
+        spline_y = CubicSpline(t_waypoints, waypoints[:, 1], bc_type='periodic')
+        spline_z = CubicSpline(t_waypoints, waypoints[:, 2], bc_type='periodic')
+        
+        # Generate smooth positions
+        smooth_positions = np.stack([spline_x(t_spline), spline_y(t_spline), spline_z(t_spline)], axis=-1)
+        
+        # Compute velocities and accelerations from the splines
+        raw_velocities = np.stack([spline_x(t_spline, 1), spline_y(t_spline, 1), spline_z(t_spline, 1)], axis=-1)
+        raw_accelerations = np.stack([spline_x(t_spline, 2), spline_y(t_spline, 2), spline_z(t_spline, 2)], axis=-1)
+        
+        # Apply smoothing to velocities and accelerations
+        smooth_velocities = savgol_filter(raw_velocities, window_length=51, polyorder=3, axis=0)  # Adjust window length
+        smooth_accelerations = savgol_filter(raw_accelerations, window_length=51, polyorder=3, axis=0)
+
+        # Clip velocities to ensure they don't exceed the desired maximum velocity
+        velocity_magnitudes = np.linalg.norm(smooth_velocities, axis=1)
+        scale_factors = np.minimum(1, self.velocity / np.maximum(velocity_magnitudes, 1e-5))
+        smooth_velocities = (smooth_velocities.T * scale_factors).T
+        
+        # Recalculate accelerations to match adjusted velocities
+        smooth_accelerations = np.gradient(smooth_velocities, self.dt, axis=0)
+        
+        # Compute yaw angles based on forward direction
+        forward_directions = np.diff(smooth_positions, axis=0, prepend=smooth_positions[0:1])
+        yaw_angles = np.arctan2(forward_directions[:, 1], forward_directions[:, 0])
+        
+        # Combine position, velocity, acceleration, and yaw into the trajectory
+        trajectory = [
+            np.array([*pos, *vel, *acc, yaw])
+            for pos, vel, acc, yaw in zip(smooth_positions, smooth_velocities, smooth_accelerations, yaw_angles)
+        ]
+        
+        hover_waypoints = self._generate_hover_waypoints()
+        return np.array(hover_waypoints + trajectory)
+
+
+    def _generate_tilted_circle_trajectory_2(self):
+        # Define waypoints relative to the starting position
+        relative_waypoints = [
+            np.array([0, 0, 0]),
+            np.array([-1.5, 1.5, -0.75]),
+            np.array([-3, 0, 0]),
+            np.array([-1.5, -1.5, 0.75]),
+            np.array([0, 0, 0])  # Complete the loop back to start
+        ]
+        
+        # Offset the waypoints by the starting position
+        waypoints = np.array([self.start + wp for wp in relative_waypoints])
+        
+        # Number of points to interpolate along the curve
+        total_points = int(len(waypoints) * 1 / self.dt)
+        
+        # Generate smooth spline for x, y, z
+        t_waypoints = np.linspace(0, 1, len(waypoints))  # Parameter for the waypoints
+        t_spline = np.linspace(0, 1, total_points)      # Fine-grained parameter for the trajectory
+        
+        spline_x = CubicSpline(t_waypoints, waypoints[:, 0], bc_type='periodic')
+        spline_y = CubicSpline(t_waypoints, waypoints[:, 1], bc_type='periodic')
+        spline_z = CubicSpline(t_waypoints, waypoints[:, 2], bc_type='periodic')
+        
+        # Generate smooth positions
+        smooth_positions = np.stack([spline_x(t_spline), spline_y(t_spline), spline_z(t_spline)], axis=-1)
+        
+        # Compute velocities and accelerations from the splines
+        raw_velocities = np.stack([spline_x(t_spline, 1), spline_y(t_spline, 1), spline_z(t_spline, 1)], axis=-1)
+        raw_accelerations = np.stack([spline_x(t_spline, 2), spline_y(t_spline, 2), spline_z(t_spline, 2)], axis=-1)
+        
+        # Apply Savitzky-Golay filter to smooth velocities and accelerations
+        smooth_velocities = savgol_filter(raw_velocities, window_length=51, polyorder=3, axis=0)
+        smooth_accelerations = savgol_filter(raw_accelerations, window_length=51, polyorder=3, axis=0)
+
+        # Clip velocities to ensure they don't exceed the desired maximum velocity
+        velocity_magnitudes = np.linalg.norm(smooth_velocities, axis=1)
+        scale_factors = np.minimum(1, self.velocity / np.maximum(velocity_magnitudes, 1e-5))
+        smooth_velocities = (smooth_velocities.T * scale_factors).T
+        
+        # Recalculate accelerations to match adjusted velocities
+        smooth_accelerations = np.gradient(smooth_velocities, self.dt, axis=0)
+        
+        # Compute yaw angles based on forward direction
+        forward_directions = np.diff(smooth_positions, axis=0, prepend=smooth_positions[0:1])
+        yaw_angles = np.arctan2(forward_directions[:, 1], forward_directions[:, 0])
+        
+        # Combine position, velocity, acceleration, and yaw into the trajectory
+        trajectory = [
+            np.array([*pos, *vel, *acc, yaw])
+            for pos, vel, acc, yaw in zip(smooth_positions, smooth_velocities, smooth_accelerations, yaw_angles)
+        ]
+        
+        # Generate hover waypoints for the trajectory
+        hover_waypoints = self._generate_hover_waypoints()
+        return np.array(hover_waypoints + trajectory)
+
+
+    def _generate_spiral_trajectory(self):
+        # Define waypoints relative to the starting position
+        relative_waypoints = [
+            np.array([0, 0, 0]),
+            np.array([-2.0, 2.0, -1.0]),
+            np.array([-4, 0, 0]),
+            np.array([-2.0, -2.0, 0.0]),
+            np.array([0, 0, 0]),  # Complete the loop back to start
+            np.array([-2.0, 2.0, 1.0]),
+            np.array([-4, 0, 0]),
+            np.array([-2.0, -2.0, 0.0]),
+            np.array([0, 0, 0])
+        ]
+        
+        # Offset the waypoints by the starting position
+        waypoints = np.array([self.start + wp for wp in relative_waypoints])
+        
+        # Number of points to interpolate along the curve
+        total_points = int(len(waypoints) * 1 / self.dt)
+        
+        # Generate smooth spline for x, y, z
+        t_waypoints = np.linspace(0, 1, len(waypoints))  # Parameter for the waypoints
+        t_spline = np.linspace(0, 1, total_points)      # Fine-grained parameter for the trajectory
+        
+        spline_x = CubicSpline(t_waypoints, waypoints[:, 0], bc_type='periodic')
+        spline_y = CubicSpline(t_waypoints, waypoints[:, 1], bc_type='periodic')
+        spline_z = CubicSpline(t_waypoints, waypoints[:, 2], bc_type='periodic')
+        
+        # Generate smooth positions
+        smooth_positions = np.stack([spline_x(t_spline), spline_y(t_spline), spline_z(t_spline)], axis=-1)
+        
+        # Compute velocities and accelerations from the splines
+        raw_velocities = np.stack([spline_x(t_spline, 1), spline_y(t_spline, 1), spline_z(t_spline, 1)], axis=-1)
+        raw_accelerations = np.stack([spline_x(t_spline, 2), spline_y(t_spline, 2), spline_z(t_spline, 2)], axis=-1)
+        
+        # Apply Savitzky-Golay filter to smooth velocities and accelerations
+        smooth_velocities = savgol_filter(raw_velocities, window_length=51, polyorder=3, axis=0)
+        smooth_accelerations = savgol_filter(raw_accelerations, window_length=51, polyorder=3, axis=0)
+
+        # Clip velocities to ensure they don't exceed the desired maximum velocity
+        velocity_magnitudes = np.linalg.norm(smooth_velocities, axis=1)
+        scale_factors = np.minimum(1, self.velocity / np.maximum(velocity_magnitudes, 1e-5))
+        smooth_velocities = (smooth_velocities.T * scale_factors).T
+        
+        # Recalculate accelerations to match adjusted velocities
+        smooth_accelerations = np.gradient(smooth_velocities, self.dt, axis=0)
+        
+        # Compute yaw angles based on forward direction
+        forward_directions = np.diff(smooth_positions, axis=0, prepend=smooth_positions[0:1])
+        yaw_angles = np.arctan2(forward_directions[:, 1], forward_directions[:, 0])
+        
+        # Combine position, velocity, acceleration, and yaw into the trajectory
+        trajectory = [
+            np.array([*pos, *vel, *acc, yaw])
+            for pos, vel, acc, yaw in zip(smooth_positions, smooth_velocities, smooth_accelerations, yaw_angles)
+        ]
+        
+        # Generate hover waypoints for the trajectory
+        hover_waypoints = self._generate_hover_waypoints()
+        return np.array(hover_waypoints + trajectory)
+
+
+
+
     def adjust_waypoint(self, current_state, next_waypoint, alpha=0.9):
         current_position = current_state[:3]
         current_velocity = current_state[3:6]
@@ -159,8 +407,9 @@ class Planner:
             if self.traj_type == 0:
                 return self.trajectory[-1]
             else:
-                self.current_index = 1
+                self.current_index = 0
                 return self.pop_waypoint(current_state)
+
                 
     
     def plot_trajectory(self):

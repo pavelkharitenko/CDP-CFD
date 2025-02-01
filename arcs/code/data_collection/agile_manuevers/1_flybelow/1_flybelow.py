@@ -155,6 +155,7 @@ def main(controller):
 
 
     # Clear and close simulator
+    
     print("Finished, clearing...")
     controller.clear()
     controller.close()

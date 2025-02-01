@@ -1,0 +1,553 @@
+---
+  world:
+    gravity:
+      - 0.0
+      - 0.0
+      - -9.81
+
+  rigid_bodies:
+    skeletons:
+      - file_path: "p600_no_collisions.urdf"
+        name: "p600"
+        initial_position:
+        - -2.0
+        - 2.0
+        - 0.0 #-0.8
+        initial_rotation:
+          angle_radians: 0.0
+          axis:
+          - 0.0
+          - 0.0
+          - 1.0
+        joint_velocities:
+          p600__rotor_0_joint:
+            - 340.0
+          p600__rotor_1_joint:
+            - 340.0
+          p600__rotor_2_joint:
+            - -340.0
+          p600__rotor_3_joint:
+            - -340.0
+      - file_path: "p600_2.urdf"
+        name: "p600_2"
+        initial_position:
+        - 0.0
+        - 0.0
+        - 0.0
+        initial_rotation:
+          angle_radians: 1.570796326794897
+          axis:
+          - 0.0
+          - 0.0
+          - 1.0
+        joint_velocities:
+          p600__rotor_0_joint:
+            - 359.0
+          p600__rotor_1_joint:
+            - 359.0
+          p600__rotor_2_joint:
+            - -359.0
+          p600__rotor_3_joint:
+            - -359.0
+    
+  fluid:
+    blocks:
+      max_block_count: 550
+    fluid:
+      resolution: 0.05
+      max_velocity: 80.0
+      initial_density: 1.225
+      initial_velocity:
+        - 0.0
+        - 0.0
+        - 0.0
+      kinematic_shear_viscosity: 1.8e-5
+
+  coupling:
+    coupling:
+      search_center_target_skeleton_name: "p600"
+      ignore_skeletons:
+        - "floor"
+    
+
+  virtual_propellers:
+    coupling:
+      search_center_target_skeleton_name: "p600"
+      default_propeller_radius: 0.195
+      propeller_models:
+        - name: "propeller-cw"
+          blades: 2
+          direction: "Reversed"
+        - name: "propeller-ccw"
+          blades: 2
+          direction: "Forward"
+      configurations:
+        - target_skeleton_name: "p600"
+          target_joint_name: "p600__rotor_0_joint" # front right, forward
+          center_offset: 0.008
+          model: "propeller-ccw"
+        - target_skeleton_name: "p600"
+          target_joint_name: "p600__rotor_1_joint" # back left, forward
+          center_offset: 0.008
+          model: "propeller-ccw"
+        - target_skeleton_name: "p600"
+          target_joint_name: "p600__rotor_2_joint" # front left, reversed
+          center_offset: 0.008
+          model: "propeller-cw"
+        - target_skeleton_name: "p600"
+          target_joint_name: "p600__rotor_3_joint" # back right, reversed
+          center_offset: 0.008
+          model: "propeller-cw"
+        - target_skeleton_name: "p600_2" ########################## Specify another 4 virtual propellers like this
+          target_joint_name: "p600__rotor_0_joint"
+          center_offset: 0.008
+          model: "propeller-ccw"
+        - target_skeleton_name: "p600_2"
+          target_joint_name: "p600__rotor_1_joint"
+          center_offset: 0.008
+          model: "propeller-ccw"
+        - target_skeleton_name: "p600_2"
+          target_joint_name: "p600__rotor_2_joint"
+          center_offset: 0.008
+          model: "propeller-cw"
+        - target_skeleton_name: "p600_2"
+          target_joint_name: "p600__rotor_3_joint"
+          center_offset: 0.008
+          model: "propeller-cw"
+
+       
+  actuators:
+  # UAV 1 motors
+    - type: "DcMotor"
+      name: "bl"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_1_joint"
+      model:
+        stall_torque: 0.4
+        zero_load_rpm: 20000.0
+      direction: "Forward" # Options: Forward, Reversed
+    - type: "DcMotor"
+      name: "br"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_3_joint"
+      model:
+        stall_torque: 0.4
+        zero_load_rpm: 20000.0
+      direction: "Reversed" # Options: Forward, Reversed
+    - type: "DcMotor"
+      name: "fl"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_2_joint"
+      model:
+        stall_torque: 0.4
+        zero_load_rpm: 20000.0
+      direction: "Reversed" # Options: Forward, Reversed
+    - type: "DcMotor"
+      name: "fr"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_0_joint"
+      model:
+        stall_torque: 0.4
+        zero_load_rpm: 20000.0
+      direction: "Forward" # Options: Forward, Reversed
+      # for second UAV P600_2
+  # UAV 2 motors
+      # for second UAV P600_2
+    - type: "DcMotor"
+      name: "bl2"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_1_joint"
+      model:
+        stall_torque: 0.4
+        zero_load_rpm: 20000.0
+      direction: "Forward" # Options: Forward, Reversed
+    - type: "DcMotor"
+      name: "br2"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_3_joint"
+      model:
+        stall_torque: 0.4
+        zero_load_rpm: 20000.0
+      direction: "Reversed" # Options: Forward, Reversed
+    - type: "DcMotor"
+      name: "fl2"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_2_joint"
+      model:
+        stall_torque: 0.4
+        zero_load_rpm: 20000.0
+      direction: "Reversed" # Options: Forward, Reversed
+    - type: "DcMotor"
+      name: "fr2"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_0_joint"
+      model:
+        stall_torque: 0.4
+        zero_load_rpm: 20000.0
+      direction: "Forward" # Options: Forward, Reversed
+    
+    - type: "MulticopterController"
+      name: "controller1"
+      imu_name: "imu1"
+      fl_motor_name: "fl"
+      fr_motor_name: "fr"
+      bl_motor_name: "bl"
+      br_motor_name: "br"
+      mixer:
+        thrust_to_pwm_power: 1.0
+        yaw_weight: 1.0
+      rate_controller:
+        control_frequency: 1000.0
+        k_proportional_gain:
+          roll: 0.3
+          pitch: 0.3
+          yaw: 0.4
+        k_integral_gain:
+          roll: 1.0
+          pitch: 1.0
+          yaw: 1.0
+        k_derivative_gain:
+          roll: 0.05
+          pitch: 0.05
+          yaw: 0.0
+        integral_limit:
+          roll: 0.3
+          pitch: 0.3
+          yaw: 0.3
+      attitude_controller:
+        control_frequency: 1000.0 #250.0
+        proportional_gain:
+          roll: 5.0
+          pitch: 5.0
+          yaw: 4.0
+        max_output_angular_rate:
+          roll: 5.0
+          pitch: 5.0
+          yaw: 4.0
+        yaw_weight: 0.4
+      position_controller:
+        control_frequency: 1000.0
+        velocity_proportional_gain:
+          - 1.8
+          - 1.8
+          - 4.0
+        velocity_integral_gain:
+          - 0.4
+          - 0.4
+          - 1.0
+        velocity_derivative_gain:
+          - 0.2
+          - 0.2
+          - 0.4
+        max_tilt: 0.4363 # 25 degrees
+        hover_thrust: 0.45
+        min_thrust: 0.1
+        max_thrust: 0.9
+        horizontal_thrust_margin: 0.6
+        position_proportional_gain:
+          - 0.95
+          - 0.95
+          - 1.0
+        max_horizontal_velocity: 12.0
+        max_up_velocity: 3.0
+        max_down_velocity: 1.5
+
+    - type: "MulticopterController"
+      name: "controller2"
+      imu_name: "imu2"
+      fl_motor_name: "fl2"
+      fr_motor_name: "fr2"
+      bl_motor_name: "bl2"
+      br_motor_name: "br2"
+      mixer:
+        thrust_to_pwm_power: 1.0
+        yaw_weight: 1.0
+      rate_controller:
+        control_frequency: 1000.0
+        k_proportional_gain:
+          roll: 0.3
+          pitch: 0.3
+          yaw: 0.4
+        k_integral_gain:
+          roll: 1.0
+          pitch: 1.0
+          yaw: 1.0
+        k_derivative_gain:
+          roll: 0.05
+          pitch: 0.05
+          yaw: 0.0
+        integral_limit:
+          roll: 0.3
+          pitch: 0.3
+          yaw: 0.3
+      attitude_controller:
+        control_frequency: 1000.0 # 250.0
+        proportional_gain:
+          roll: 5.0
+          pitch: 5.0
+          yaw: 4.0
+        max_output_angular_rate:
+          roll: 5.0
+          pitch: 5.0
+          yaw: 4.0
+        yaw_weight: 0.4
+      position_controller:
+        control_frequency: 1000.0 #50.0
+        velocity_proportional_gain:
+          - 1.8
+          - 1.8
+          - 4.0
+        velocity_integral_gain:
+          - 0.4
+          - 0.4
+          - 1.0
+        velocity_derivative_gain:
+          - 0.2
+          - 0.2
+          - 0.4
+        max_tilt: 0.4363 # 25 degrees
+        hover_thrust: 0.45
+        min_thrust: 0.1
+        max_thrust: 0.9
+        horizontal_thrust_margin: 0.6
+        position_proportional_gain:
+          - 0.95
+          - 0.95
+          - 1.0
+        max_horizontal_velocity: 12.0
+        max_up_velocity: 3.0
+        max_down_velocity: 1.5
+      
+
+  sensors:
+    - type: "Blocks"
+      name: "blocks"
+    
+    # imus of uav 1 and 2
+    - type: "Body"
+      name: "imu1"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__imu_link"
+      offset:
+        - 0.0
+        - 0.0
+        - 0.0
+      up_axis: "ZPositive"
+      forward_axis: "XPositive"
+
+    - type: "Body"
+      name: "imu2"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__imu_link"
+      offset:
+        - 0.0
+        - 0.0
+        - 0.0
+      up_axis: "ZPositive"
+      forward_axis: "XPositive"
+
+    # UAV 2 External z force sensors (base and rotors)
+    - type: "ExternalForce"
+      name: "uav_2_force_sensor_body_z" # base z
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__base_link"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+    - type: "ExternalForce"
+      name: "uav_2_force_sensor_rotor_1_z"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__rotor_0"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+    - type: "ExternalForce"
+      name: "uav_2_force_sensor_rotor_2_z"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__rotor_1"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+    - type: "ExternalForce"
+      name: "uav_2_force_sensor_rotor_3_z"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__rotor_2"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+    - type: "ExternalForce"
+      name: "uav_2_force_sensor_rotor_4_z"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__rotor_3"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+
+    # add UAV 1 Ext.Force Body, and rotors sensors
+    - type: "ExternalForce"
+      name: "uav_1_force_sensor_body_z"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__base_link"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+    - type: "ExternalForce"
+      name: "uav_1_force_sensor_rotor_1_z"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_0"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+    - type: "ExternalForce"
+      name: "uav_1_force_sensor_rotor_2_z"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_1"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+    - type: "ExternalForce"
+      name: "uav_1_force_sensor_rotor_3_z"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_2"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+    - type: "ExternalForce"
+      name: "uav_1_force_sensor_rotor_4_z"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_3"
+      averaging_period: 0
+      force_axis_local:
+          - 0.0
+          - 0.0
+          - 1.0
+    
+    # UAV 1 JFT Body, IMU and rotor force sensors
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_body"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__base_link"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_imu"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__imu_link"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_rotor1"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_0"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_rotor2"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_1"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_rotor3"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_2"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_1_jft_sensor_rotor4"
+      target_skeleton_name: "p600"
+      target_body_name: "p600__rotor_3"
+      averaging_period: 0
+
+
+    # rotor joint sensors of UAV 1
+    - type: "Joint"
+      name: "uav_1_joint_sensor_r1"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_0_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_1_joint_sensor_r2"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_1_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_1_joint_sensor_r3"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_2_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_1_joint_sensor_r4"
+      target_skeleton_name: "p600"
+      target_joint_name: "p600__rotor_3_joint"
+      mode: "Velocity"
+
+    
+    # UAV 2 body, IMU and rotor force sensors
+    - type: "JointForceTorque"
+      name: "uav_2_jft_sensor_body"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__base_link"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_2_jft_sensor_imu"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__imu_link"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_2_jft_sensor_rotor1"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__rotor_0"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_2_jft_sensor_rotor2"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__rotor_1"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_2_jft_sensor_rotor3"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__rotor_2"
+      averaging_period: 0
+    - type: "JointForceTorque"
+      name: "uav_2_jft_sensor_rotor4"
+      target_skeleton_name: "p600_2"
+      target_body_name: "p600__rotor_3"
+      averaging_period: 0
+
+    # rotor joint sensors of UAV 2
+    - type: "Joint"
+      name: "uav_2_joint_sensor_r1"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_0_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_2_joint_sensor_r2"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_1_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_2_joint_sensor_r3"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_2_joint"
+      mode: "Velocity"
+    - type: "Joint"
+      name: "uav_2_joint_sensor_r4"
+      target_skeleton_name: "p600_2"
+      target_joint_name: "p600__rotor_3_joint"
+      mode: "Velocity"
+
+      

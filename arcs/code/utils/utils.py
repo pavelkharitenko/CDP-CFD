@@ -7,16 +7,15 @@ from numpy import random as rnd
 from shapely.geometry import Polygon, Point
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from tabulate import tabulate
-sys.path.append('../../uav/')
-from uav import *
-
-
-
+from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 from scipy.spatial.transform import Rotation as R
 
-sys.path.append('../../../observers/')
 
+sys.path.append('../../uav/')
+from uav import *
+
+sys.path.append('../../../observers/')
 
 
 #from ndp.model import DWPredictor
@@ -27,8 +26,11 @@ sys.path.append('../../../observers/')
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
+# 1 plotting functions
 
-def plot_xy_slices(model):
+# 1 ndp
+
+def plot_xy_slices_ndp(model):
     """
     Visualize (x,y,z) output of NN as 2D heatmap. Based on "plot_historgrams" at
     https://github.com/Li-Jinjie/ndp_nmpc_qd/blob/master/ndp_nmpc/scripts/dnwash_nn_est/nn_train.py
@@ -130,7 +132,7 @@ def plot_xy_slices(model):
     
     plt.show()
 
-def plot_zy_yx_slices(model):
+def plot_zy_yx_slices_ndp(model):
     # Plot xy-slices at different Z-values:
     xy_plane_z_samples = [-0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
     xy_range = 1.2 # size of XY plane
@@ -230,8 +232,7 @@ def plot_zy_yx_slices(model):
     
     plt.show()
 
-
-def plot_z_slices(model):
+def plot_z_slices_ndp(model):
     # Plot xy-slices at different Z-values:
     xy_plane_z_samples = [-0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
     xy_range = 1.0 # size of XY plane
@@ -381,6 +382,7 @@ def plot_model_compare(model_list):
     
     plt.show()
 
+# 1 so2
 
 def plot_so2_line(model):
     # generate custom trajectory of bravo uav
@@ -416,7 +418,166 @@ def plot_so2_line(model):
     plt.legend()
     plt.show()
 
+def plot_xy_slices_so2(model):
+    # Plot xy-slices at different Z-values:
+    xy_plane_z_samples = [-1.0, -0.5, 0.0, 0.5, 1.0 ]
+    xy_range = 1.0 # size of XY plane
+    plane_res = 200 # number of points sampled for plotting in one dimension
 
+    color="autumn"
+    test_f = []
+    fig, ax = plt.subplots(1, len(xy_plane_z_samples), sharex=True, sharey=True)
+
+    
+    model.eval()
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    
+    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
+
+    all_imgs = [] # save all
+
+    # loop over Z-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 9])
+        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                dx = [xy_samples[i], xy_samples[j], z_point]
+                vB = [0.0, 0.1, 0.0]
+                vA = [0.0, 0.0, 0.0]
+
+                hx = np.array(h(dx, vB, vA))
+
+                with torch.no_grad():
+                    hx = torch.from_numpy(hx).to(torch.float32).cuda()
+
+                    model_pred = model(hx)
+                    pred_dw = F(dx, model_pred)
+                    
+                    plot_f[i, j] = pred_dw[2].cpu()
+                    plotted_forces.append(pred_dw[2].cpu().numpy())
+               
+
+        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[idx].set_title(f"Z = {z_point}m")
+        
+    
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    # add the bar and fix min-max colormap
+    for im in all_imgs:
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    plt.xlabel('Forces in Newton (N)')
+    
+    plt.show()
+
+def plot_zy_xy_slices_so2(model):
+    # Plot xy-slices at different Z-values:
+    xy_plane_z_samples = [-1.0, -0.5, 0.0, 0.5, 1.0 ]
+    xy_range = 1.0 # size of XY plane
+    plane_res = 200 # number of points sampled for plotting in one dimension
+
+    color="autumn"
+    test_f = []
+    fig, ax = plt.subplots(2, len(xy_plane_z_samples), sharex=True, sharey=True)
+
+    
+    model.eval()
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    
+    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
+
+    all_imgs = [] # save all
+
+    # loop over Z-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 9])
+        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                dx = [xy_samples[i], xy_samples[j], z_point]
+                vB = [0.0, 0.1, 0.0]
+                vA = [0.0, 0.0, 0.0]
+
+                hx = np.array(h(dx, vB, vA))
+
+                with torch.no_grad():
+                    hx = torch.from_numpy(hx).to(torch.float32).cuda()
+
+                    model_pred = model(hx)
+                    pred_dw = F(dx, model_pred)
+                    
+                    plot_f[i, j] = pred_dw[2].cpu()
+                    plotted_forces.append(pred_dw[2].cpu().numpy())
+               
+
+        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[0][idx].set_title(f"Z = {z_point}m")
+        
+    
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    # plot xz-slice
+
+    # loop over Y-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 9])
+        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                dx = [xy_samples[i], z_point, xy_samples[j]]
+                vB = [0.0, 0.1, 0.0]
+                vA = [0.0, 0.0, 0.0]
+
+                hx = np.array(h(dx, vB, vA))
+
+                with torch.no_grad():
+                    hx = torch.from_numpy(hx).to(torch.float32).cuda()
+
+                    model_pred = model(hx)
+                    pred_dw = F(dx, model_pred)
+                    
+                    plot_f[i, j] = pred_dw[2].cpu()
+                    plotted_forces.append(pred_dw[2].cpu().numpy())
+               
+
+        im = ax[1][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[1][idx].set_title(f"Y = {z_point}m")
+
+    # add the bar and fix min-max colormap
+    for im in all_imgs:
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    plt.xlabel('Forces in Newton (N)')
+    
+    plt.show()
+
+# 1 ns
 
 def plot_zy_yx_slices_ns(model):
     # Plot xy-slices at different Z-values:
@@ -518,6 +679,77 @@ def plot_zy_yx_slices_ns(model):
     plt.show()
 
 
+def plot_z_slices_ns(model):
+    # Plot xy-slices at different Z-values:
+    xy_plane_z_samples = [-1.5, -1.0, -0.75, -0.5, 0.0, 0.5, 1.0, 1.25, 1.5]
+    xy_range = 1.0 # size of XY plane
+    plane_res = 400 # number of points sampled for plotting in one dimension
+
+    color="autumn"
+    test_f = []
+    fig, ax = plt.subplots(1, len(xy_plane_z_samples), sharex=True, sharey=True)
+
+    
+    model.eval()
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    
+    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
+
+    all_imgs = [] # save all
+
+    # loop over Z-heights and generate plane_res*plane_res sample points
+    for idx, z_point in enumerate(xy_plane_z_samples):
+        
+        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
+        sample_matrix = np.zeros([plane_res**2, 6])
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                sample_matrix[i * plane_res + j, 0] = xy_samples[i]
+                sample_matrix[i * plane_res + j, 1] = xy_samples[j]
+                sample_matrix[i * plane_res + j, 2] = z_point
+        
+        
+        sample_tensor = torch.from_numpy(sample_matrix).to(torch.float32)
+        input = torch.autograd.Variable(sample_tensor).cuda()
+        output = model(input)
+        test_f.append(output)
+        zs = output
+        
+        # add all encountered z-forces and save them for evaluating 
+        plotted_forces.extend(zs.detach().cpu().numpy())
+
+
+        plot_f = np.zeros((plane_res, plane_res))
+
+        for i in range(plane_res):
+            for j in range(plane_res):
+                plot_f[i, j] = zs[i * plane_res + j]
+
+        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
+                               cmap=color, origin='lower', interpolation='none')
+        all_imgs.append(im)
+        ax[idx].set_title(f"Z = {z_point}m")
+        
+    
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+
+    # add the bar and fix min-max colormap
+    for im in all_imgs:
+        #im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
+
+
+    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
+    plt.xlabel('Forces in Newton (N)')
+    
+    
+    plt.show()
+
+# other
+
 def plot_zy_xy_slices_empirical(model):
     # Plot xy-slices at different Z-values:
     xy_plane_z_samples = [-1.0, -0.5, 0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25 ]
@@ -598,237 +830,6 @@ def plot_zy_xy_slices_empirical(model):
     plt.xlabel('Forces in Newton (N)')
     
     plt.show()
-
-def plot_z_slices_ns(model):
-    # Plot xy-slices at different Z-values:
-    xy_plane_z_samples = [-1.5, -1.0, -0.75, -0.5, 0.0, 0.5, 1.0, 1.25, 1.5]
-    xy_range = 1.0 # size of XY plane
-    plane_res = 400 # number of points sampled for plotting in one dimension
-
-    color="autumn"
-    test_f = []
-    fig, ax = plt.subplots(1, len(xy_plane_z_samples), sharex=True, sharey=True)
-
-    
-    model.eval()
-    model.to("cuda" if torch.cuda.is_available() else "cpu")
-    
-    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
-
-    all_imgs = [] # save all
-
-    # loop over Z-heights and generate plane_res*plane_res sample points
-    for idx, z_point in enumerate(xy_plane_z_samples):
-        
-        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
-        sample_matrix = np.zeros([plane_res**2, 6])
-
-        for i in range(plane_res):
-            for j in range(plane_res):
-                sample_matrix[i * plane_res + j, 0] = xy_samples[i]
-                sample_matrix[i * plane_res + j, 1] = xy_samples[j]
-                sample_matrix[i * plane_res + j, 2] = z_point
-        
-        
-        sample_tensor = torch.from_numpy(sample_matrix).to(torch.float32)
-        input = torch.autograd.Variable(sample_tensor).cuda()
-        output = model(input)
-        test_f.append(output)
-        zs = output
-        
-        # add all encountered z-forces and save them for evaluating 
-        plotted_forces.extend(zs.detach().cpu().numpy())
-
-
-        plot_f = np.zeros((plane_res, plane_res))
-
-        for i in range(plane_res):
-            for j in range(plane_res):
-                plot_f[i, j] = zs[i * plane_res + j]
-
-        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
-        all_imgs.append(im)
-        ax[idx].set_title(f"Z = {z_point}m")
-        
-    
-    fig.subplots_adjust(right=0.8)
-    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-    fig.colorbar(im, cax=cbar_ax)
-
-    # add the bar and fix min-max colormap
-    for im in all_imgs:
-        #im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
-        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
-
-
-    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
-    plt.xlabel('Forces in Newton (N)')
-    
-    
-    plt.show()
-
-
-def plot_so2_xy_slice(model):
-    # Plot xy-slices at different Z-values:
-    xy_plane_z_samples = [-1.0, -0.5, 0.0, 0.5, 1.0 ]
-    xy_range = 1.0 # size of XY plane
-    plane_res = 200 # number of points sampled for plotting in one dimension
-
-    color="autumn"
-    test_f = []
-    fig, ax = plt.subplots(1, len(xy_plane_z_samples), sharex=True, sharey=True)
-
-    
-    model.eval()
-    model.to("cuda" if torch.cuda.is_available() else "cpu")
-    
-    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
-
-    all_imgs = [] # save all
-
-    # loop over Z-heights and generate plane_res*plane_res sample points
-    for idx, z_point in enumerate(xy_plane_z_samples):
-        
-        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
-        sample_matrix = np.zeros([plane_res**2, 9])
-        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
-        plot_f = np.zeros((plane_res, plane_res))
-
-        for i in range(plane_res):
-            for j in range(plane_res):
-                dx = [xy_samples[i], xy_samples[j], z_point]
-                vB = [0.0, 0.1, 0.0]
-                vA = [0.0, 0.0, 0.0]
-
-                hx = np.array(h(dx, vB, vA))
-
-                with torch.no_grad():
-                    hx = torch.from_numpy(hx).to(torch.float32).cuda()
-
-                    model_pred = model(hx)
-                    pred_dw = F(dx, model_pred)
-                    
-                    plot_f[i, j] = pred_dw[2].cpu()
-                    plotted_forces.append(pred_dw[2].cpu().numpy())
-               
-
-        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
-        all_imgs.append(im)
-        ax[idx].set_title(f"Z = {z_point}m")
-        
-    
-    fig.subplots_adjust(right=0.8)
-    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-    fig.colorbar(im, cax=cbar_ax)
-
-    # add the bar and fix min-max colormap
-    for im in all_imgs:
-        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
-
-    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
-    plt.xlabel('Forces in Newton (N)')
-    
-    plt.show()
-
-
-def plot_so2_zy_xy_slices(model):
-    # Plot xy-slices at different Z-values:
-    xy_plane_z_samples = [-1.0, -0.5, 0.0, 0.5, 1.0 ]
-    xy_range = 1.0 # size of XY plane
-    plane_res = 200 # number of points sampled for plotting in one dimension
-
-    color="autumn"
-    test_f = []
-    fig, ax = plt.subplots(2, len(xy_plane_z_samples), sharex=True, sharey=True)
-
-    
-    model.eval()
-    model.to("cuda" if torch.cuda.is_available() else "cpu")
-    
-    plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
-
-    all_imgs = [] # save all
-
-    # loop over Z-heights and generate plane_res*plane_res sample points
-    for idx, z_point in enumerate(xy_plane_z_samples):
-        
-        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
-        sample_matrix = np.zeros([plane_res**2, 9])
-        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
-        plot_f = np.zeros((plane_res, plane_res))
-
-        for i in range(plane_res):
-            for j in range(plane_res):
-                dx = [xy_samples[i], xy_samples[j], z_point]
-                vB = [0.0, 0.1, 0.0]
-                vA = [0.0, 0.0, 0.0]
-
-                hx = np.array(h(dx, vB, vA))
-
-                with torch.no_grad():
-                    hx = torch.from_numpy(hx).to(torch.float32).cuda()
-
-                    model_pred = model(hx)
-                    pred_dw = F(dx, model_pred)
-                    
-                    plot_f[i, j] = pred_dw[2].cpu()
-                    plotted_forces.append(pred_dw[2].cpu().numpy())
-               
-
-        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
-        all_imgs.append(im)
-        ax[0][idx].set_title(f"Z = {z_point}m")
-        
-    
-    fig.subplots_adjust(right=0.8)
-    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-    fig.colorbar(im, cax=cbar_ax)
-
-    # plot xz-slice
-
-    # loop over Y-heights and generate plane_res*plane_res sample points
-    for idx, z_point in enumerate(xy_plane_z_samples):
-        
-        xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
-        sample_matrix = np.zeros([plane_res**2, 9])
-        sample_matrix[:, 1] = 0.1 # rel velocity 0.1
-        plot_f = np.zeros((plane_res, plane_res))
-
-        for i in range(plane_res):
-            for j in range(plane_res):
-                dx = [xy_samples[i], z_point, xy_samples[j]]
-                vB = [0.0, 0.1, 0.0]
-                vA = [0.0, 0.0, 0.0]
-
-                hx = np.array(h(dx, vB, vA))
-
-                with torch.no_grad():
-                    hx = torch.from_numpy(hx).to(torch.float32).cuda()
-
-                    model_pred = model(hx)
-                    pred_dw = F(dx, model_pred)
-                    
-                    plot_f[i, j] = pred_dw[2].cpu()
-                    plotted_forces.append(pred_dw[2].cpu().numpy())
-               
-
-        im = ax[1][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
-        all_imgs.append(im)
-        ax[1][idx].set_title(f"Y = {z_point}m")
-
-    # add the bar and fix min-max colormap
-    for im in all_imgs:
-        im.set_clim(vmin=np.min(plotted_forces), vmax=np.max(plotted_forces))
-
-    fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
-    plt.xlabel('Forces in Newton (N)')
-    
-    plt.show()
-
 
 
 def plot_3D_forces(model):
@@ -967,6 +968,10 @@ def plot_static_dw_collection(state_sufferer, state_producer, ef_sufferer, jft_s
     ax4.legend()
 
 
+
+
+# 2 experiment 
+
 def init_experiment(env_name):  
     experiment_name = datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "-" + env_name + "-"+ randomname.get_name()
     print("###############################################")
@@ -995,8 +1000,6 @@ def save_experiment(exp_name, uav_list, success, sim_duration, bias=None):
         #print("#### Saved.")
         #print("################################")
         return save_name
-
-      
 
 
 def load_forces_from_dataset(exp_pkl_path):
@@ -1100,6 +1103,7 @@ def compute_residual_dw_forces(uav):
     return dw_force_vectors
 
 
+# planning
     
 def plan_next_coords(sample_distance, safety_distance, self_pos, other_uav_pos):
     xmax, xmin = other_uav_pos[0] + sample_distance, other_uav_pos[0] - sample_distance
@@ -1145,7 +1149,6 @@ def plan_next_coords(sample_distance, safety_distance, self_pos, other_uav_pos):
     return other_uav_pos[0], other_uav_pos[1], other_uav_pos[2] + 1
 
 
-
 def sample_next_coords(sample_distance_z, sample_distance, safety_distance, other_uav_pos):
     xmax, xmin = other_uav_pos[0] + sample_distance, other_uav_pos[0] - sample_distance
     ymax, ymin = other_uav_pos[1] + sample_distance, other_uav_pos[1] - sample_distance
@@ -1184,138 +1187,6 @@ def evaluate_zy_force_curvature(models, rel_state_vectors):
     return predicted_z_curves
 
 
-def euler_angles_to_quaternion(roll, pitch, yaw):
-    """
-    Converts Euler angles (attitude angles) to a quaternion.
-    
-    Parameters:
-    roll -- Roll angle [-pi,pi] (in degrees)
-    pitch -- Pitch angle [-pi/2, pi/2] (in degrees)
-    yaw -- Yaw angle (in degrees)
-    
-    Returns:
-    (qw, qx, qy, qz) -- Corresponding quaternion
-    """
-    # Convert to raidans
-    roll *= np.pi/180
-    pitch *= np.pi/180
-    yaw *= np.pi/180
-
-    # Calculate half-angles
-    cy = math.cos(yaw * 0.5)
-    sy = math.sin(yaw * 0.5)
-    cp = math.cos(pitch * 0.5)
-    sp = math.sin(pitch * 0.5)
-    cr = math.cos(roll * 0.5)
-    sr = math.sin(roll * 0.5)
-
-    # Calculate quaternion
-    w = cr * cp * cy + sr * sp * sy
-    x = sr * cp * cy - cr * sp * sy
-    y = cr * sp * cy + sr * cp * sy
-    z = cr * cp * sy - sr * sp * cy
-
-    return w, x, y, z
-
-
-
-
-def rps_to_thrust_p005_mrv80(mean_rps):
-    """
-    Function to calculate thrust for given avg. rps, accurate for 340-430rps.
-    Constants derived from range of measurements
-    """
-    a = 0.00019339212
-    b = 0.01897496901
-    c = -4.52623347271
-
-    #Ct =  0.000362
-    #rho = 1.225
-    #A = 0.11948
-    #k = Ct * rho * A
-    #d = 0.3
-    #F = k * one_rotor_rps**2
-    
-    return a*mean_rps**2 + b* mean_rps + c
-
-
-def omega_to_thrust_p005_mrv80(mean_rps):
-    """
-    Computes force by F = c * omega^2, accurate for any range
-    Constants derived experimentally.
-    """
-    Ct =  0.000362
-    rho = 1.225
-    A = 0.11948
-    k = Ct * rho * A
-    d = 0.3
-
-    return 4.0*k * mean_rps**2.0
-
-def discretize_shapes(vertices_list, n_cells=18.0, plot=False):
-    """
-    Creates 2d frame from vertices, disretizes as grid with cells and plots optionally
-    """
-
-    total_grid_points = []
-
-    if plot:
-        
-        plt.figure(figsize=(8, 8))
-
-    for vertices in vertices_list:
-        frame_shape = Polygon(vertices)
-
-        # Set the grid size (5 cm = 0.05 meters)
-
-        # Define the bounding box for the grid based on the diamond shape
-        min_x, min_y, max_x, max_y = frame_shape.bounds
-
-        x_cell_size = (max_x - min_x) / n_cells
-        y_cell_size = (max_y - min_y) / n_cells
-
-
-        # Generate the grid points within the bounding box
-        x_coords = np.arange(min_x, max_x , x_cell_size)
-        y_coords = np.arange(min_y, max_y, y_cell_size)
-        
-        X, Y = np.meshgrid(x_coords, y_coords)
-        grid_points = np.vstack([X.ravel(), Y.ravel()]).T
-
-        # Check which points are inside the diamond shape
-        inside_points = [point for point in grid_points if frame_shape.contains(Point(point))]
-
-        # Convert the inside points to an array for plotting
-        inside_points = np.array(inside_points)
-        
-        
-        total_grid_points.extend(inside_points)
-
-        # Plot the diamond shape and the discretized points
-        if plot:
-            #plt.figure(figsize=(8, 8))
-            plt.plot(*zip(*vertices, vertices[0]), color='black', linewidth=2)
-            plt.scatter(inside_points[:, 0], inside_points[:, 1], color='blue', s=4)
-    
-    total_grid_points = np.array(total_grid_points)
-
-    if plot:
-        plt.xlabel("X (meters)")
-        plt.ylabel("Y (meters)")
-        plt.legend()
-        plt.title(f"Discretized Frame for {x_cell_size}m grid cell length")
-        plt.axis("equal")
-        plt.grid(True)
-        #plt.scatter(total_grid_points[:,0], total_grid_points[:,1], color="red", s=5)
-        plt.show()
-    
-    A_cell = x_cell_size*y_cell_size
-    return total_grid_points, x_cell_size, y_cell_size
-
-
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 def sample_3d_point(y_pos):
     """
@@ -1366,7 +1237,6 @@ def plot_distribution(num_samples=100):
     plt.show()
 
 
-
 def smooth_with_savgol(data, window_size=5, poly_order=2):
     """
     Smooths the input data using the Savitzky-Golay filter while keeping the number of output points unchanged.
@@ -1397,6 +1267,8 @@ def sample_from_range(lower,upper):
 
     return random_numbers[0]
 
+
+# UAV state and force computations
 
 def extract_and_plot_data(data_set_paths=None, 
                           predictors=[], 
@@ -1520,10 +1392,8 @@ def extract_and_plot_data(data_set_paths=None,
 
 
 def extract_data(uav_1_states, uav_2_states, time_seq):
-    plot = True
     mass = 3.035
     g = -9.85
-
 
     # 1 extract necessary parameters from uav states
     u2_rotations = [R.from_euler('xyz', [yaw_pitch_roll[2], yaw_pitch_roll[1], yaw_pitch_roll[0]], degrees=False) for yaw_pitch_roll in np.array(uav_2_states)[:,9:12]]
@@ -1542,6 +1412,150 @@ def extract_data(uav_1_states, uav_2_states, time_seq):
     u2_z_dw_forces = smoothed_u2_z_forces - u2_thrusts
 
     return u2_z_dw_forces, overlap_indices, overlaps
+
+def extract_dw_forces(uav_states):
+    mass = 3.035
+    g = -9.85
+
+    uav_states = np.array(uav_states)
+
+    # 1 extract necessary parameters from uav states
+    u2_rotations = [R.from_euler('xyz', [yaw_pitch_roll[2], yaw_pitch_roll[1], yaw_pitch_roll[0]], degrees=False) for yaw_pitch_roll in uav_states[:,9:12]]
+    u2_avg_rps = np.mean(np.abs(uav_states[:,22:26]), axis=1)
+    
+
+    # 2 compute uav actual forces, smooth them, and compute controller z-axis forces, and their residual disturbance
+    smoothed_u2_x_forces, smoothed_u2_y_forces, smoothed_u2_z_forces = extract_uav_forces(uav_states)
+
+    u2_x_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[0] for (avg_rps, u2_rotations) in zip(u2_avg_rps, u2_rotations)]
+    u2_y_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[1] for (avg_rps, u2_rotations) in zip(u2_avg_rps, u2_rotations)]
+    u2_z_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[2] + (g*mass) for (avg_rps, u2_rotations) in zip(u2_avg_rps, u2_rotations)]
+    u2_x_dw_forces = smoothed_u2_x_forces - np.array(u2_x_thrusts)
+    u2_y_dw_forces = smoothed_u2_y_forces - np.array(u2_y_thrusts)
+    u2_z_dw_forces = smoothed_u2_z_forces - np.array(u2_z_thrusts)
+
+    return u2_x_dw_forces, u2_y_dw_forces, u2_z_dw_forces
+
+
+def extract_uav_forces(uav_states):
+    mass = 3.035
+    # compute uav actual forces, smooth them, and compute controller z-axis forces, and their residual disturbance
+    uav_x_forces = uav_states[:,6] * mass
+    uav_y_forces = uav_states[:,7] * mass
+    uav_z_forces = uav_states[:,8] * mass
+
+    smoothed_uav_x_forces = smooth_with_savgol(uav_x_forces, window_size=21, poly_order=1)
+    smoothed_uav_y_forces = smooth_with_savgol(uav_y_forces, window_size=21, poly_order=1)
+    smoothed_uav_z_forces = smooth_with_savgol(uav_z_forces, window_size=21, poly_order=1)
+
+    return smoothed_uav_x_forces, smoothed_uav_y_forces, smoothed_uav_z_forces
+
+
+def rps_to_thrust_p005_mrv80(mean_rps):
+    """
+    Function to calculate thrust for given avg. rps, accurate for 340-430rps.
+    Constants derived from range of measurements
+    """
+    a = 0.00019339212
+    b = 0.01897496901
+    c = -4.52623347271
+
+    #Ct =  0.000362
+    #rho = 1.225
+    #A = 0.11948
+    #k = Ct * rho * A
+    #d = 0.3
+    #F = k * one_rotor_rps**2
+    
+    return a*mean_rps**2 + b* mean_rps + c
+
+
+def omega_to_thrust_p005_mrv80(mean_rps):
+    """
+    Computes force by F = c * omega^2, accurate for any range
+    Constants derived experimentally.
+    """
+    Ct =  0.000362
+    rho = 1.225
+    A = 0.11948
+    k = Ct * rho * A
+    d = 0.3
+
+    return 4.0*k * mean_rps**2.0
+
+def discretize_shapes(vertices_list, n_cells=18.0, plot=False):
+    """
+    Creates 2d frame from vertices, disretizes as grid with cells and plots optionally
+    """
+
+    total_grid_points = []
+
+    if plot:
+        
+        plt.figure(figsize=(8, 8))
+
+    for vertices in vertices_list:
+        frame_shape = Polygon(vertices)
+
+        # Set the grid size (5 cm = 0.05 meters)
+
+        # Define the bounding box for the grid based on the diamond shape
+        min_x, min_y, max_x, max_y = frame_shape.bounds
+
+        x_cell_size = (max_x - min_x) / n_cells
+        y_cell_size = (max_y - min_y) / n_cells
+
+
+        # Generate the grid points within the bounding box
+        x_coords = np.arange(min_x, max_x , x_cell_size)
+        y_coords = np.arange(min_y, max_y, y_cell_size)
+        
+        X, Y = np.meshgrid(x_coords, y_coords)
+        grid_points = np.vstack([X.ravel(), Y.ravel()]).T
+
+        # Check which points are inside the diamond shape
+        inside_points = [point for point in grid_points if frame_shape.contains(Point(point))]
+
+        # Convert the inside points to an array for plotting
+        inside_points = np.array(inside_points)
+        
+        
+        total_grid_points.extend(inside_points)
+
+        # Plot the diamond shape and the discretized points
+        if plot:
+            #plt.figure(figsize=(8, 8))
+            plt.plot(*zip(*vertices, vertices[0]), color='black', linewidth=2)
+            plt.scatter(inside_points[:, 0], inside_points[:, 1], color='blue', s=4)
+    
+    total_grid_points = np.array(total_grid_points)
+
+    if plot:
+        plt.xlabel("X (meters)")
+        plt.ylabel("Y (meters)")
+        plt.legend()
+        plt.title(f"Discretized Frame for {x_cell_size}m grid cell length")
+        plt.axis("equal")
+        plt.grid(True)
+        #plt.scatter(total_grid_points[:,0], total_grid_points[:,1], color="red", s=5)
+        plt.show()
+    
+    A_cell = x_cell_size*y_cell_size
+    return total_grid_points, x_cell_size, y_cell_size
+
+
+
+def compute_thrust_vector(uav_states):
+        """
+        Returns list of Thrust vectors [x,y,z] rotated accordingly to uav's orientation
+        """
+        thrusts = rps_to_thrust_p005_mrv80(np.mean(uav_states[:,22:26], axis=1, keepdims=True))
+        #print(thrusts[:5])
+        thrust_vectors = np.column_stack((np.zeros(len(thrusts)), np.zeros(len(thrusts)), thrusts))
+        rotations = R.from_euler('zyx', uav_states[:,9:12])
+        thrust_list = rotations.apply(thrust_vectors) 
+
+        return thrust_list
 
 
 
@@ -1836,7 +1850,7 @@ def plot_trajectory_analysis(actual_positions, planned_positions, actual_velocit
     plt.show()
 
 
-from scipy.interpolate import interp1d
+
 
 def compute_trajectory_errors(actual_positions, actual_velocities, planned_positions, ignore_start=0, ignore_end=0):
     """
@@ -2004,6 +2018,101 @@ def plot_trajectory_analysis_two_uavs(actual_positions_uav1, planned_positions_u
     plt.show()
 
 
+
+def plot_trajectory_analysis_rmse(
+    actual_positions_uav1, planned_positions_uav1, actual_velocities_uav1,
+    actual_positions_uav2, planned_positions_uav2, actual_velocities_uav2,
+    ignore_start=0, ignore_end=0
+):
+    """
+    Plot trajectory tracking errors, velocities, and relative distances for two UAVs.
+    Also computes RMSE for positions and velocities.
+    """
+    overlap_threshold = 1.0
+    sns.set(style="whitegrid")
+    plt.rcParams.update({'font.size': 10})
+
+    # Compute position and velocity errors for both UAVs
+    pos_err_uav1 = actual_positions_uav1 - planned_positions_uav1[:,:3]
+    vel_err_uav1 = actual_velocities_uav1 - planned_positions_uav1[:,3:6]
+    pos_err_uav2 = actual_positions_uav2 - planned_positions_uav2[:,:3]
+    vel_err_uav2 = actual_velocities_uav2 - planned_positions_uav2[:,3:6]
+
+    # Ignore start and end sections for analysis
+    pos_err_uav1 = pos_err_uav1[ignore_start:len(pos_err_uav1) - ignore_end]
+    vel_err_uav1 = vel_err_uav1[ignore_start:len(vel_err_uav1) - ignore_end]
+    pos_err_uav2 = pos_err_uav2[ignore_start:len(pos_err_uav2) - ignore_end]
+    vel_err_uav2 = vel_err_uav2[ignore_start:len(vel_err_uav2) - ignore_end]
+
+    # Compute RMSE for position and velocity trajectories
+    rmse_pos_uav1 = np.sqrt(np.mean(np.square(pos_err_uav1), axis=0))
+    rmse_vel_uav1 = np.sqrt(np.mean(np.square(vel_err_uav1), axis=0))
+    rmse_pos_uav2 = np.sqrt(np.mean(np.square(pos_err_uav2), axis=0))
+    rmse_vel_uav2 = np.sqrt(np.mean(np.square(vel_err_uav2), axis=0))
+
+    # Print RMSE results
+    print("UAV 1 - RMSE (Position): X: {:.3f}, Y: {:.3f}, Z: {:.3f}".format(*rmse_pos_uav1))
+    print("UAV 1 - RMSE (Velocity): X: {:.3f}, Y: {:.3f}, Z: {:.3f}".format(*rmse_vel_uav1))
+    print("UAV 2 - RMSE (Position): X: {:.3f}, Y: {:.3f}, Z: {:.3f}".format(*rmse_pos_uav2))
+    print("UAV 2 - RMSE (Velocity): X: {:.3f}, Y: {:.3f}, Z: {:.3f}".format(*rmse_vel_uav2))
+
+    # Relative XY distance between UAVs
+    rel_xy_distances = np.sqrt((actual_positions_uav1[:, 0] - actual_positions_uav2[:, 0])**2 +
+                               (actual_positions_uav1[:, 1] - actual_positions_uav2[:, 1])**2)
+    rel_xy_distances = rel_xy_distances[ignore_start:len(rel_xy_distances) - ignore_end]
+
+    # Plot position, velocity, and relative distance errors
+    fig, axes = plt.subplots(3, 2, figsize=(18, 20))
+
+    # UAV1 and UAV2 Z-Position
+    sns.lineplot(y=actual_positions_uav1[:, 2], x=np.arange(len(actual_positions_uav1)), ax=axes[0, 0], label='UAV1 Actual Z')
+    sns.lineplot(y=planned_positions_uav1[:, 2], x=np.arange(len(planned_positions_uav1)), ax=axes[0, 0], label='UAV1 Planned Z')
+    sns.lineplot(y=actual_positions_uav2[:, 2], x=np.arange(len(actual_positions_uav2)), ax=axes[0, 0], label='UAV2 Actual Z', linestyle="--")
+    sns.lineplot(y=planned_positions_uav2[:, 2], x=np.arange(len(planned_positions_uav2)), ax=axes[0, 0], label='UAV2 Planned Z', linestyle="--")
+    axes[0, 0].set_title("Z-Position Comparison")
+    axes[0, 0].set_ylabel("Z-Position (m)")
+
+    # UAV1 and UAV2 Z-Error
+    sns.lineplot(y=pos_err_uav1[:, 2], x=np.arange(len(pos_err_uav1)), ax=axes[1, 0], label='UAV1 Z-Error')
+    sns.lineplot(y=pos_err_uav2[:, 2], x=np.arange(len(pos_err_uav2)), ax=axes[1, 0], label='UAV2 Z-Error')
+    axes[1, 0].set_title("Z-Position Error")
+    axes[1, 0].set_ylabel("Error (m)")
+
+    # Relative XY distance
+    sns.lineplot(y=rel_xy_distances, x=np.arange(len(rel_xy_distances)), ax=axes[2, 0], label="Relative XY Distance")
+    axes[2, 0].set_title("Relative XY Distance Between UAV1 and UAV2")
+    axes[2, 0].set_ylabel("Distance (m)")
+
+    # Velocity components for UAV1 and UAV2
+    for i, label in enumerate(['X', 'Y', 'Z']):
+        sns.lineplot(y=actual_velocities_uav1[:, i], x=np.arange(len(actual_velocities_uav1)), ax=axes[0, 1], label=f'UAV1 {label}-Velocity')
+        sns.lineplot(y=actual_velocities_uav2[:, i], x=np.arange(len(actual_velocities_uav2)), ax=axes[0, 1], label=f'UAV2 {label}-Velocity', linestyle="--")
+    axes[0, 1].set_title("Velocity Components")
+    axes[0, 1].set_ylabel("Velocity (m/s)")
+
+    # Bar plots for RMSE
+    x_labels = ['X', 'Y', 'Z']
+    rmse_pos = [rmse_pos_uav1, rmse_pos_uav2]
+    rmse_vel = [rmse_vel_uav1, rmse_vel_uav2]
+
+    for i, label in enumerate(["UAV1", "UAV2"]):
+        axes[1, 1].bar(np.arange(3) + i * 0.3, rmse_pos[i], width=0.3, label=f"{label} Position RMSE")
+        axes[2, 1].bar(np.arange(3) + i * 0.3, rmse_vel[i], width=0.3, label=f"{label} Velocity RMSE")
+
+    axes[1, 1].set_title("Position RMSE")
+    axes[1, 1].set_ylabel("RMSE (m)")
+    axes[1, 1].set_xticks(np.arange(3))
+    axes[1, 1].set_xticklabels(x_labels)
+
+    axes[2, 1].set_title("Velocity RMSE")
+    axes[2, 1].set_ylabel("RMSE (m/s)")
+    axes[2, 1].set_xticks(np.arange(3))
+    axes[2, 1].set_xticklabels(x_labels)
+
+    plt.tight_layout()
+    plt.show()
+
+
 def analyze_forces(uav_forces, thrust_forces, predictor_forces_z, nfc_forces, dt):
     """
     Plots two subplots with y-data and calculated x-data based on time step.
@@ -2086,8 +2195,6 @@ def get_thrust_xyz_forces(uav_state):
     
     return uav_xyz_forces
 
-import numpy as np
-import matplotlib.pyplot as plt
 
 def plot_uav_positions_and_errors(uav1_positions, uav2_positions, target_positions1,target_positions2, dt):
     """
@@ -2183,3 +2290,252 @@ def plot_uav_positions_and_errors(uav1_positions, uav2_positions, target_positio
 
     plt.tight_layout()
     plt.show()
+
+
+# helper functions
+
+
+
+# methods for equivariant transformation
+
+def equivariant_agile_transform(u1_states, u2_states):
+    """
+    Returns equivariant representation w.r.t Z-axis
+    """
+
+    # extract xy and z from pos, vel, thrust, and 2nd uav's total force f
+    dp_xy = u1_states[:,:2] - u2_states[:,:2]
+    dp_z = u1_states[:,2] - u2_states[:,2]
+
+    v1_xy = u1_states[:,3:5]
+    v1_z = u1_states[:,5]
+    v2_xy = u2_states[:,3:5]
+    v2_z = u2_states[:,5]
+
+    v1_xy, _, v2_xy = process_vectors(v1_xy, dp_xy, v2_xy)
+    angle_v1_dp_xy = compute_signed_angles(dp_xy, v1_xy)
+    angle_v1_v2_xy = compute_signed_angles(v2_xy, v1_xy)
+
+
+    # compute T1 thrust vectors and their orientations and translations 
+    T1 = compute_thrust_vector(u1_states)
+    T1_xy = T1[:,:2]
+    T1_z = T1[:,2]
+    
+    T2 = compute_thrust_vector(u2_states)
+    T2_xy = T2[:,:2]
+    T2_z = T2[:,2]
+
+    # symmetry assumptions: flip T1 to left side of dp, and flip T2 accordingly to T2
+    T1_xy_flipped, _, T2_xy = process_vectors(T1_xy, dp_xy, T2_xy)
+
+    angle_T1_T2_xy = compute_signed_angles(T2_xy, T1_xy_flipped)
+    angle_T1_dp_xy = compute_signed_angles(dp_xy, T1_xy_flipped)
+
+    # force vector f of uav 2
+    
+    f_x, f_y, f_z = extract_uav_forces(u2_states)
+    f_xy = np.column_stack((f_x,f_y))
+    _, _, f_xy = process_vectors(T1_xy, dp_xy, f_xy)
+    angle_f_dp_xy = compute_signed_angles(dp_xy, f_xy)
+
+
+    result = (np.linalg.norm(dp_xy, axis=1), dp_z, 
+                angle_T1_dp_xy, 
+                np.linalg.norm(T1_xy_flipped, axis=1), T1_z, 
+                np.linalg.norm(T2_xy, axis=1), T2_z, angle_T1_T2_xy, 
+                angle_v1_dp_xy, 
+                np.linalg.norm(v1_xy, axis=1), v1_z, 
+                np.linalg.norm(v2_xy, axis=1), v2_z, angle_v1_v2_xy,
+                np.linalg.norm(f_xy, axis=1), f_z, angle_f_dp_xy
+            )
+
+    # returns |[dp]xy|, [dp]z, 
+    # angle_xy(T1,dp), 
+    # |[T1]xy|, [T1]z, 
+    # |[T2]xy|, [T2]z, angle_xy(T2,T1), 
+    # angle_xy(v1,dp), 
+    # |[v1]xy|, [v1]z, 
+    # |[v2]xy|, [v2]z, angle_xy(v1,v2)
+    # [f]xy, [f]z, angle_xy(f, dp)
+    return np.column_stack(result)
+
+
+def continous_transform(equivariant_states):
+    """
+    Input is columns of |dp_xy|, dp_z, angle_T1_dp, |T1_xy|, T1_z, ...
+    """
+    T1_decomp = angle_demcomposition(equivariant_states[:,2], equivariant_states[:,3])
+    T2_decomp = angle_demcomposition(equivariant_states[:,7], equivariant_states[:,5])
+    v1_decomp = angle_demcomposition(equivariant_states[:,8], equivariant_states[:,9])
+    v2_decomp = angle_demcomposition(equivariant_states[:,13], equivariant_states[:,11])
+
+    f_decomp = angle_demcomposition(equivariant_states[:,16], equivariant_states[:,14])
+
+    dw_decomp = f_decomp - T2_decomp
+
+
+
+    result = (
+        # z-axis components and dp length
+        equivariant_states[:, 0], # |p_xy|
+        equivariant_states[:, 1], # p_z
+        equivariant_states[:,4], # T1_z
+        equivariant_states[:,6], # T2_z
+        equivariant_states[:,10], # v1_z
+        equivariant_states[:,12], # v2_z
+        # new angle independant sinusoidal encodings
+        T1_decomp[:,0], T1_decomp[:,1],
+        T2_decomp[:,0], T2_decomp[:,1],
+        v1_decomp[:,0], v1_decomp[:,1],
+        v2_decomp[:,0], v2_decomp[:,1],
+        dw_decomp[:,0], dw_decomp[:,1],
+    )
+
+    return np.column_stack(result)
+
+
+def angle_demcomposition(angles, amplitudes):
+    # returns sinusoidal encoding of vector a and angle: sin(b)a, cos(b)a
+    result = np.column_stack((amplitudes * np.cos(angles), amplitudes * np.sin(angles)))
+    return result
+
+
+def mirror_vectors(v1, v2):
+    """Mirror vectors v1 around vectors v2."""
+    # Mirror the vectors v1 around v2 using the formula
+    dot_product = np.sum(v1 * v2, axis=1)
+    norm_v2_squared = np.sum(v2 * v2, axis=1)
+    return 2 * (dot_product / norm_v2_squared).reshape(-1, 1) * v2 - v1
+
+
+def process_vectors(vectors1, vectors2, vectors3):
+    """
+    If first vector i is to the left of the second vector, mirror it to the right 
+    and mirror the vector i of the third list to the opposite side.
+    """
+    # if T1 is left of dp, mirror T1 to right, and flip T2
+    cross_prod = np.cross(vectors1, vectors2)
+    mask = cross_prod > 0.0  # means vector1 is to the left of vector2 (positive cross product)
+    
+    # Mirror T1 and T2 based on mask
+    vectors1[mask] = mirror_vectors(vectors1[mask], vectors2[mask])
+    vectors3[mask] = mirror_vectors(vectors3[mask], vectors2[mask])
+
+    # where T1 is collinear to dp, bring T2 to right side
+    mask_2 = cross_prod == 0.0
+    cross_prod32 = np.cross(vectors3, vectors2)
+    mask_3 = cross_prod32 > 0.0 # means T2 is to the left of vector2 (positive cross product)
+    v1_colin_and_v3_left = mask_2 & mask_3
+    vectors3[v1_colin_and_v3_left] = mirror_vectors(vectors3[v1_colin_and_v3_left], 
+                                                   vectors2[v1_colin_and_v3_left])
+
+    return vectors1, vectors2, vectors3
+
+
+# triginometric
+
+def compute_signed_angles(v1_list, v2_list):
+    """
+    Computes the signed and normalized angles between corresponding vectors in two lists.
+    
+    Parameters:
+        v1_list (np.ndarray): Array of shape (N, 2), list of 2D vectors.
+        v2_list (np.ndarray): Array of shape (N, 2), list of 2D vectors.
+    
+    Returns:
+        tuple: Two arrays of shape (N,) - signed angles and normalized angles.
+    """
+    # Ensure inputs are numpy arrays
+    v1_list = np.array(v1_list)
+    v2_list = np.array(v2_list)
+    
+    # Compute the signed angle using atan2
+    angles = np.arctan2(v2_list[:, 1], v2_list[:, 0]) - np.arctan2(v1_list[:, 1], v1_list[:, 0])
+    
+    # Normalize angles to [0, 2π)
+    angles_normalized = angles % (2 * np.pi)
+    
+    return angles_normalized
+    
+
+
+def euler_angles_to_quaternion(roll, pitch, yaw):
+    """
+    Converts Euler angles (attitude angles) to a quaternion.
+    
+    Parameters:
+    roll -- Roll angle [-pi,pi] (in degrees)
+    pitch -- Pitch angle [-pi/2, pi/2] (in degrees)
+    yaw -- Yaw angle (in degrees)
+    
+    Returns:
+    (qw, qx, qy, qz) -- Corresponding quaternion
+    """
+    # Convert to raidans
+    roll *= np.pi/180
+    pitch *= np.pi/180
+    yaw *= np.pi/180
+
+    # Calculate half-angles
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+
+    # Calculate quaternion
+    w = cr * cp * cy + sr * sp * sy
+    x = sr * cp * cy - cr * sp * sy
+    y = cr * sp * cy + sr * cp * sy
+    z = cr * cp * sy - sr * sp * cy
+
+    return w, x, y, z
+
+
+def normalize_vector(v, epsilon=1e-6):
+    norm = np.linalg.norm(v, axis=-1, keepdims=True)  # Compute norm along the last axis
+    return np.where(norm < epsilon, np.full_like(v, epsilon), v / norm)  # Handle small vectors
+
+
+
+def orthogonal_projection(dp_xy, dw_xy_rel):
+    # projects dw onto dp as if dp were (1,0)
+    e_x = normalize_vector(dp_xy)
+
+    print("e_x", e_x)
+    e_y = np.stack([-e_x[:, 1], e_x[:, 0]], axis=1)
+    print("e_y", e_y)
+
+    #print("dw_xy_rel",dw_xy_rel)
+
+    print("dp",dp_xy)
+    print("dw_xy_rel", dw_xy_rel)
+
+    
+    return dw_xy_rel[:,0:1] * e_x + dw_xy_rel[:,1:2] * e_y
+
+
+
+
+
+T = np.array([[0.0,1.0], [-1.0,1.0],])
+
+dp = np.array([[0.0,3.0],[0.0,3.0]])
+
+signed_angles = compute_signed_angles(dp, T)
+
+print("angles", (180.0/np.pi) * signed_angles)
+
+print("magnitudes",np.linalg.norm(T, axis=1))
+decomp = angle_demcomposition(signed_angles, np.linalg.norm(T, axis=1))
+
+print("decomp", decomp)
+
+
+
+#magn = normalize_vector(T)
+#print("Normalized", magn)
+print("proj", orthogonal_projection(dp, decomp))
+

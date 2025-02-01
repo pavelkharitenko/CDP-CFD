@@ -29,8 +29,8 @@ class NonlinearFeedbackController3:
         #self.M = np.eye(3) * self.uav_mass
         self.G = self.uav_mass * np.array([0, 0, self.g])
 
-        self.k_p = np.array([2.0,2.0, 32.0]) #np.array([3.0,3.0, 18.0]) 
-        self.k_v = np.array([2.0,2.0, 27.0]) #np.array([3.0,3.0, 15.0]) 
+        self.k_p = np.array([4.0,4.0, 32.0]) #np.array([3.0,3.0, 18.0]) 
+        self.k_v = np.array([1.0,1.0, 27.0]) #np.array([3.0,3.0, 15.0]) 
 
         
         
