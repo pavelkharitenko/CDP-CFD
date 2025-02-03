@@ -25,7 +25,9 @@ class DWDataset(torch.utils.data.Dataset):
             uav_1_states, uav_2_states = data['uav_1_states'], data['uav_2_states']
             
             x_i = uav_1_states[:,:6] - uav_2_states[:,:6] # compute rel. state of pos. and vel.
-            y_i = data['dw_forces']
+            #y_i = data['dw_forces']
+            dw_x,dw_y,dw_z = extract_dw_forces(uav_2_states)
+            y_i = np.column_stack((dw_x,dw_y,dw_z))
 
             x = np.vstack((x, x_i))
             y = np.vstack((y,y_i))

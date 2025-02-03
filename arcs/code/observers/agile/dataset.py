@@ -95,14 +95,15 @@ class AgileContinousDataset(torch.utils.data.Dataset):
             
             dw_x, dw_y, dw_z = extract_dw_forces(uav_2_states)
 
-            x_dw_ct = continous_transform(equivariant_agile_transform(uav_1_states, uav_2_states))
+            eqv_ag_tr, _ = equivariant_agile_transform(uav_1_states, uav_2_states)
+            x_dw_ct = continous_transform(eqv_ag_tr)
             x_i = x_dw_ct[:,:14]
             dw_xy = x_dw_ct[:,14:16] # use transformed xy
-
+            
             #print("shape dw_xy:", dw_xy.shape)
             #print("shape dw_z:", dw_z.shape)
 
-            y_i = np.column_stack((dw_xy, dw_z))
+            y_i = np.column_stack((dw_xy[:,0],dw_xy[:,1], dw_z))
             #print("shape y_i:", y_i.shape)
             x = np.vstack((x,x_i))
             y = np.vstack((y,y_i))

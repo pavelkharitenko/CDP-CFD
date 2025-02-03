@@ -114,7 +114,7 @@ class NonlinearFeedbackController3:
     
 
 
-    def nonlinear_feedback(self, desired, feedforward=np.zeros(3), uav_z_force=0):
+    def nonlinear_feedback(self, desired, feedforward=np.zeros(3)):
         f_xyz = self.pc_nf(desired, feedforward)
         self.fxyz = f_xyz
         
@@ -125,11 +125,11 @@ class NonlinearFeedbackController3:
         return self.set_xyz_force(*f_xyz)
         
 
-    def nonlinear_feedback_qt_px4(self, desired, feedforward=np.zeros(3), uav_z_force=0):
+    def nonlinear_feedback_qt_px4(self, desired, feedforward=np.zeros(3)):
         """
         Nonlinear feedback output force, and converted to RPY-thrust for px4 attitude controller
         """
-        roll, pitch, yaw, thrust = self.nonlinear_feedback(desired, feedforward, uav_z_force)
+        roll, pitch, yaw, thrust = self.nonlinear_feedback(desired, feedforward)
         print("thrust:", thrust)
 
         roll, pitch, yaw = np.array([roll, pitch, yaw]) * 180.0/np.pi # convert to radians

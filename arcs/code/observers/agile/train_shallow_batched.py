@@ -24,16 +24,15 @@ load_model = None
 device = "cuda" if torch.cuda.is_available() else "cpu"
 n_epochs = 50
 
-lr = 1e-4
+lr = 3e-4
 #sn_gamma = 4 # scale factor for spectral normalization
 sn_gamma = None
 
 
 model_name = f"Agile-Shallow-batched-sn-{str(sn_gamma)}-123S"
-exp_name = init_experiment(model_name)
+
  
-# --- Step 4: Training Function ---
-# --- Updated Training Function ---
+
 def train_nn_with_validation(model, train_loader, val_loader, optimizer, criterion, epochs=20):
     model.train()
     tr_losses = []
@@ -135,7 +134,7 @@ def train():
 
     train_data, val_data = train_test_split(dataset,test_size=0.25, shuffle=True)
 
-    batch_size = 64
+    batch_size = 32
 
 
 
@@ -164,20 +163,18 @@ def train():
         model = AgileShallowPredictor(output_dim=3).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
-    loss_fn = torch.nn.MSELoss()
+    
 
 
     train_errors, val_errors = [], []
 
     model = model.to(device)
-
-    # Optimizer and loss function
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    criterion = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    #criterion = torch.nn.MSELoss()
+    criterion = WeightedMSELoss()
 
     # Train the model
     train_errors, val_errors = train_nn_with_validation(model, train_loader, val_loader, optimizer, criterion, epochs=n_epochs)
-
 
 
     # print model statistics and intermediately save if necessary

@@ -260,7 +260,7 @@ def compute_thrust_vector(uav_states):
         Returns list of Thrust vectors [x,y,z] rotated accordingly to uav's orientation
         """
         thrusts = rps_to_thrust_p005_mrv80(np.mean(uav_states[:,22:26], axis=1, keepdims=True))
-        print(thrusts[:5])
+        #print(thrusts[:5])
         thrust_vectors = np.column_stack((np.zeros(len(thrusts)), np.zeros(len(thrusts)), thrusts))
         rotations = R.from_euler('zyx', uav_states[:,9:12])
         thrust_list = rotations.apply(thrust_vectors) 

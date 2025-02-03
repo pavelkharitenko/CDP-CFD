@@ -58,38 +58,23 @@ for title_idx, path_idx in enumerate([[0],[1],[2],[3],[0,1,2,3]]):
 
     print("dataset length", len(uav_1_states))
     rel_state_vector_list = np.array(uav_1_states) - np.array(uav_2_states)
-    u2_z_dw_forces, overlap_indices, overlaps = extract_data(uav_1_states, uav_2_states, time_seq)
+    _, overlap_indices, overlaps = extract_data(uav_1_states, uav_2_states, time_seq)
+    u2_x_dw_forces, u2_y_dw_forces, u2_z_dw_forces = extract_dw_forces(uav_2_states)
 
 
 
 
     model_paths = [
-    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-12-09-23-07-36-NSwarm-sn-None-123S-tall-hearth10000_eps.pth",
-    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-12-09-23-07-36-NSwarm-sn-None-123S-tall-hearth20000_eps.pth",
-    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\neuralswarm\2024-12-09-23-07-36-NSwarm-sn-None-123S-tall-hearth50000_eps.pth",
-    #r"/home/pavel/Desktop\IDP\CDP-CFD\arcs\code\observers\agile\trained_models\agile_continous_models\123S\2024-12-09-15-49-54-Agile-Cont-full-data-sn-None-123S-broad-ramp10000_eps.pth",
-    # NNARX
-    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\NNARX\2024-12-10-16-19-51-NNARX-lags-1-123S-factorial-radiator20_eps.pth",
-    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\NNARX\2024-12-10-16-37-41-NNARX-lags-5-123S-chamfered-artifact20_eps.pth",
-    #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\NNARX\2024-12-10-16-43-39-NNARX-lags-10-123S-modern-buyer20_eps.pth",
-    #r"/home/pavel/Desktop\IDP\CDP-CFD\arcs\code\observers\NNARX\2024-12-10-16-47-28-NNARX-lags-15-123S-warped-vocoder20_eps.pth",
-    #r"/home/pavel/Desktop\IDP\CDP-CFD\arcs\code\observers\agile\2024-12-11-19-55-09-Agile-Shllw-full-data-sn-None-123S-future-country30000_eps.pth",
-    #r"/home/pavel/Desktop\IDP\CDP-CFD\arcs\code\observers\agile\2024-12-11-19-55-09-Agile-Shllw-full-data-sn-None-123S-future-country20000_eps.pth",
-    #r"/home/pavel/Desktop\IDP\CDP-CFD\arcs\code\observers\agile\2024-12-11-19-55-09-Agile-Shllw-full-data-sn-None-123S-future-country10000_eps.pth"
 
     # NDP
-    find_file_with_substring("adaptive-partition20"),   
-
+    find_file_with_substring("raw-remote30"),  
     # Agile Cont.
-    find_file_with_substring("broad-ramp10000"),
-    # NNARX
-    find_file_with_substring("warped-vocoder20"),
-    # Agile Shallow
-    find_file_with_substring("future-country10000"),
-    #find_file_with_substring("future-country20000"),
-    find_file_with_substring("future-country30000"),
+    #find_file_with_substring("broad-ramp10000"),
+    #find_file_with_substring("future-country30000"),
     #find_file_with_substring("polynomial-sectional20"),
-    find_file_with_substring("upbeat-elk30"),
+    #find_file_with_substring("upbeat-elk30"),
+    find_file_with_substring("crunchy-muffler200"),
+
 
 
 
@@ -115,53 +100,30 @@ for title_idx, path_idx in enumerate([[0],[1],[2],[3],[0,1,2,3]]):
     model.load_state_dict(torch.load(model_paths[0], weights_only=True))
     models.append(model)
 
-    model_al1 = AgileContinousPredictor()
-    model_al1.load_state_dict(torch.load(model_paths[1], weights_only=True))
+    #model_al1 = AgileContinousPredictor()
+    #model_al1.load_state_dict(torch.load(model_paths[1], weights_only=True))
 
-    model_al2 = NNARXModel(input_dim=210)
-    model_al2.load_state_dict(torch.load(model_paths[2], weights_only=True))
+    #model_al4 = AgileShallowPredictor()
+    #model_al4.load_state_dict(torch.load(model_paths[1], weights_only=True))
 
-    model_al3 = AgileShallowPredictor()
-    model_al3.load_state_dict(torch.load(model_paths[3], weights_only=True))
-
-    model_al4 = AgileShallowPredictor()
-    model_al4.load_state_dict(torch.load(model_paths[4], weights_only=True))
-
-    model_al5 = AgileShallowPredictor()
-    model_al5.load_state_dict(torch.load(model_paths[5], weights_only=True))
-
-
-
-    # model_al1 = AgileContinousPredictor()
-    # model_al1.load_state_dict(torch.load(model_paths[1], weights_only=True))
-
-    # model_al2 = AgileContinousPredictor()
-    # model_al2.load_state_dict(torch.load(model_paths[2], weights_only=True))
-
-    # model_al3 = AgileContinousPredictor()
-    # model_al3.load_state_dict(torch.load(model_paths[3], weights_only=True))
-
+    model_al5 = AgileShallowPredictor(output_dim=3)
+    model_al5.load_state_dict(torch.load(model_paths[1], weights_only=True))
 
 
 
     predictions = []
     predictions.append(model.evaluate(rel_state_vector_list[:,:6]))
-    #predictions = evaluate_zy_force_curvature(models, np.array(rel_state_vector_list)[:,:6])
-    predictions.append(model_al1.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
-    predictions.append(model_al2.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
-    predictions.append(model_al3.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
-    predictions.append(model_al4.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
     predictions.append(model_al5.evaluate(np.array(uav_1_states), np.array(uav_2_states)))
 
 
 
     labels = [ 
     "NDP batched 20e",
+    "Shallow 30e",
     "Agile 20k full data",
     "NNARX 15",
     "shllw 10",
     "shllw 30",
-    "Shallow 30e",
     ]
 
 
@@ -184,11 +146,15 @@ for title_idx, path_idx in enumerate([[0],[1],[2],[3],[0,1,2,3]]):
 
         
         plot_array_with_segments(fig, np.array(time_seq)[overlaps], prediction[:,2][overlaps], roll=roll_iterations, color=colors[idx], label=labels[idx])
+        #plot_array_with_segments(fig, np.array(time_seq)[overlaps], prediction[:,1][overlaps], roll=roll_iterations, color=colors[idx], label=labels[idx])
+
         #compute_rmse(prediction[:,2][overlaps], u2_z_dw_forces[overlaps],label=labels[idx])
         #print(f"R2 score of {labels[idx]}", r2_score(u2_z_dw_forces[overlaps],prediction[:,2][overlaps]))
 
         # Compute metrics
         metrics = compute_metrics(u2_z_dw_forces[overlaps], prediction[:, 2][overlaps])
+        #metrics = compute_metrics(u2_y_dw_forces[overlaps], prediction[:, 1][overlaps])
+
         metrics["Label"] = labels[idx]
         all_results.append(metrics)
     

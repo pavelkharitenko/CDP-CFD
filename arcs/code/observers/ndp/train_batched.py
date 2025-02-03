@@ -90,7 +90,7 @@ if __name__ == "__main__":
     SAVE_MODEL = True
 
 
-    n_epochs = 20
+    n_epochs = 30
     exp_name = init_experiment(f"NDP-batched-sn-None-123S")
 
     # set seed
@@ -99,18 +99,17 @@ if __name__ == "__main__":
     np.random.seed(2)
 
     dataset = DWDataset([
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\speeds_05_20\raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\speeds_05_20\raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\speeds_05_20\raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_05_20\raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_20_40\raw_data_3_swapping_fast_200Hz_80_005_len56629ts_173_iterations.npz",
+        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz"),
+        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz"),
+        find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz"),
+        find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len56629ts_173_iterations.npz"),
+        find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz"),
         ])
     
-    dataset_eval = DWDataset([
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\1_flybelow\speeds_05_20\raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\2_flyabove\speeds_05_20\raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_05_20\raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz",
-        r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\agile_manuevers\3_swapping\speeds_20_40\raw_data_3_swapping_fast_200Hz_80_005_len20802ts_67_iterations_testset.npz",
+    dataset_eval = DWDataset([find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz"),
+        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz"),
+        find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz"),
+        find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len20802ts_67_iterations_testset.npz"),
         ])
 
     # Data preparation
@@ -135,8 +134,8 @@ if __name__ == "__main__":
     model = model.to(device)
 
     # Optimizer and loss function
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    criterion = NormalizedMSELoss()
 
     # Train the model
     print("Training model...")
@@ -160,9 +159,9 @@ if __name__ == "__main__":
     model.eval()
     #print(model(st))
     #plot_xy_slices(model)
-    plot_zy_yx_slices(model)
-    plot_z_slices(model)
-    plot_3D_forces(model)
+    #plot_zy_yx_slices(model)
+    #plot_z_slices(model)
+    #plot_3D_forces(model)
 
     final_model_name = exp_name + str(n_epochs) + "_eps"  + ".pth"
     if SAVE_MODEL:

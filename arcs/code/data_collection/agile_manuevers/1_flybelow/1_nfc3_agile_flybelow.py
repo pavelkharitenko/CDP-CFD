@@ -23,12 +23,12 @@ from utils import *
 
 def main(controller):
     # manuever specific
-    MANUEVER_NAME = "1_nfc_flybelow"
+    MANUEVER_NAME = "1_nfc3_flybelow"
     port = 25556
     nan = float('NaN')
 
     # exp specific
-    SIM_MAX_DURATION = 38.0
+    SIM_MAX_DURATION = 8.0
     HOVER_DURATION = 0.0
     
     
@@ -63,7 +63,7 @@ def main(controller):
 
     target_velocity = 2.4
     acceleration_time = 2.0
-    hover_time = 30.0
+    hover_time = 0.0
     planner = Planner(velocity=target_velocity, acceleration_time=acceleration_time, dt=0.005, hover_time=hover_time, 
                       start=(0.0,-2.5,-1.5), 
                       end=(0.0,7.0,-1.5), 
@@ -75,8 +75,12 @@ def main(controller):
 
     # load disturbance predictor
 
-    predictor = AgileShallowPredictor()
-    predictor.load_state_dict(torch.load(find_file_with_substring("upbeat-elk30"), weights_only=True))
+    #predictor = AgileShallowPredictor()
+    #predictor.load_state_dict(torch.load(find_file_with_substring("upbeat-elk30"), weights_only=True))
+    predictor = AgileShallowPredictor(output_dim=3)
+
+    predictor.load_state_dict(torch.load(find_file_with_substring("crunchy-muffler200"), weights_only=True))
+
 
     ndp_predictor = DWPredictor()
     ndp_predictor.load_state_dict(torch.load(find_file_with_substring("adaptive-partition20"), weights_only=True))
@@ -128,7 +132,7 @@ def main(controller):
         #feedforward = ndp_feedforward # enable alternative predictor
         feedforward_forces_z.append(feedforward[2])
         uav_thrust_forces.append(uav_xyz_force)
-        feedforward = np.zeros(3) # disable feedforward term
+        #feedforward = np.zeros(3) # disable feedforward term
 
         
         px4_input_2 = nfc2.nonlinear_feedback_qt_px4(desired_waypoint, feedforward)
@@ -168,11 +172,12 @@ def main(controller):
             #nfc2.s_int = np.zeros(3)
             #uav_1.states[-1][0] += 2.0
             feedforward = predictor.evaluate(np.array(uav_1.states[-1]).reshape(1,-1), np.array(uav_2.states[-1]).reshape(1,-1))[0]
+            
 
             #feedforward = predictor.evaluate(np.array(uav_1.states[-1]).reshape(1,-1), np.array(uav_2.states[-1]).reshape(1,-1))[0]
             ndp_feedforward = ndp_predictor.evaluate(np.array(uav_2.states[-1])[:6] - np.array(uav_1.states[-1])[:6])
-
-            feedforward *= 0.8
+            
+            #feedforward *= 0.8
             #feedforward -= np.array([0.0,-5.0,0.0]) # add y error
             print("################### ############")
             print("FEEDFORWARD:", ndp_feedforward)

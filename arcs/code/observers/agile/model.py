@@ -36,21 +36,29 @@ class AgileShallowPredictor(nn.Module):
         """
 
         with torch.no_grad():
-            x_dw_ct = continous_transform(equivariant_agile_transform(uav_1_state, uav_2_state))
+            eqv_agile_transform, flipped_idx = equivariant_agile_transform(uav_1_state, uav_2_state, inference=True)
+            x_dw_ct = continous_transform(eqv_agile_transform)
             x_ct = x_dw_ct[:,:14]
             #dw_xy = x_dw_ct[:,14:16]
             inputs = torch.tensor(x_ct).to(torch.float32)
             dw_forces = self.forward(inputs).cpu().numpy()
             
             dw_xy_rel = dw_forces[:,:2]
+            #print("#### dw:", dw_xy_rel.shape)
             dp_xy = uav_1_state[:,:2] - uav_2_state[:,:2]
-            dw_xy = orthogonal_projection(dp_xy, dw_xy_rel)
-            dw_z = dw_forces[:,:1]
-            
-            fxy = fxy_rel
+            if len(dp_xy) == 1:
+                dw_xy = orthogonal_projection(np.array([dp_xy]).reshape(1,-1), np.array([dw_xy_rel]).reshape(1,-1))
+                
+            else:
+                #print("shape dp", dp_xy.shape)
+                dw_xy = orthogonal_projection(dp_xy, dw_xy_rel)
+
+            # flip y axis of disturbance if true disturbance has been on left before equiv. transform
+            #dw_xy[flipped_idx,1] *= -1.0
+            dw_z = dw_forces[:,2]
 
 
-            return np.column_stack((np.zeros((len(force_list), 2)), force_list))
+            return np.column_stack((dw_xy[:,0], dw_xy[:,1], dw_z))
 
 
 

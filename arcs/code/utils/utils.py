@@ -1430,6 +1430,7 @@ def extract_dw_forces(uav_states):
     u2_x_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[0] for (avg_rps, u2_rotations) in zip(u2_avg_rps, u2_rotations)]
     u2_y_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[1] for (avg_rps, u2_rotations) in zip(u2_avg_rps, u2_rotations)]
     u2_z_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[2] + (g*mass) for (avg_rps, u2_rotations) in zip(u2_avg_rps, u2_rotations)]
+    #print(u2_x_thrusts[:30])
     u2_x_dw_forces = smoothed_u2_x_forces - np.array(u2_x_thrusts)
     u2_y_dw_forces = smoothed_u2_y_forces - np.array(u2_y_thrusts)
     u2_z_dw_forces = smoothed_u2_z_forces - np.array(u2_z_thrusts)
@@ -1549,10 +1550,11 @@ def compute_thrust_vector(uav_states):
         """
         Returns list of Thrust vectors [x,y,z] rotated accordingly to uav's orientation
         """
-        thrusts = rps_to_thrust_p005_mrv80(np.mean(uav_states[:,22:26], axis=1, keepdims=True))
+        
+        thrusts = rps_to_thrust_p005_mrv80(np.mean(np.abs(uav_states[:,22:26]), axis=1, keepdims=True))
         #print(thrusts[:5])
         thrust_vectors = np.column_stack((np.zeros(len(thrusts)), np.zeros(len(thrusts)), thrusts))
-        rotations = R.from_euler('zyx', uav_states[:,9:12])
+        rotations = R.from_euler('zyx', uav_states[:,9:12], degrees=False)
         thrust_list = rotations.apply(thrust_vectors) 
 
         return thrust_list
@@ -2298,7 +2300,7 @@ def plot_uav_positions_and_errors(uav1_positions, uav2_positions, target_positio
 
 # methods for equivariant transformation
 
-def equivariant_agile_transform(u1_states, u2_states):
+def equivariant_agile_transform(u1_states, u2_states, inference=False):
     """
     Returns equivariant representation w.r.t Z-axis
     """
@@ -2312,7 +2314,7 @@ def equivariant_agile_transform(u1_states, u2_states):
     v2_xy = u2_states[:,3:5]
     v2_z = u2_states[:,5]
 
-    v1_xy, _, v2_xy = process_vectors(v1_xy, dp_xy, v2_xy)
+    #v1_xy, _, v2_xy, _ = process_vectors(v1_xy, dp_xy, v2_xy)
     angle_v1_dp_xy = compute_signed_angles(dp_xy, v1_xy)
     angle_v1_v2_xy = compute_signed_angles(v2_xy, v1_xy)
 
@@ -2323,31 +2325,46 @@ def equivariant_agile_transform(u1_states, u2_states):
     T1_z = T1[:,2]
     
     T2 = compute_thrust_vector(u2_states)
+    #print("T2", T2[:5])
     T2_xy = T2[:,:2]
     T2_z = T2[:,2]
 
     # symmetry assumptions: flip T1 to left side of dp, and flip T2 accordingly to T2
-    T1_xy_flipped, _, T2_xy = process_vectors(T1_xy, dp_xy, T2_xy)
+    #T1_xy_flipped, _, T2_xy, flipped_idx = process_vectors(T1_xy, dp_xy, T2_xy)
 
-    angle_T1_T2_xy = compute_signed_angles(T2_xy, T1_xy_flipped)
-    angle_T1_dp_xy = compute_signed_angles(dp_xy, T1_xy_flipped)
+    angle_T1_T2_xy = compute_signed_angles(T2_xy, T1_xy)#_flipped)
+    angle_T1_dp_xy = compute_signed_angles(dp_xy, T1_xy)#_flipped)
 
     # force vector f of uav 2
-    
-    f_x, f_y, f_z = extract_uav_forces(u2_states)
+    if not inference:
+        f_x, f_y, f_z = extract_uav_forces(u2_states)
+        dw_x, dw_y, dw_z = extract_dw_forces(u2_states)
+        f_x = dw_x
+        f_y = dw_y
+    else:
+        # during runtime do not compute xyz-residual forces
+        #print("inference time....")
+        f_x, f_y, f_z = np.zeros((len(dp_xy),1)), np.zeros((len(dp_xy),1)), np.zeros((len(dp_xy),1))
+
     f_xy = np.column_stack((f_x,f_y))
-    _, _, f_xy = process_vectors(T1_xy, dp_xy, f_xy)
-    angle_f_dp_xy = compute_signed_angles(dp_xy, f_xy)
+    #_, _, f_xy, _ = process_vectors(T1_xy, dp_xy, f_xy)
+
+    dw_xy = f_xy
+
+
+    #print("equiv_agil.dw_xy", dw_xy[:3])
+    angle_dw_dp_xy = compute_signed_angles(dp_xy, dw_xy)
 
 
     result = (np.linalg.norm(dp_xy, axis=1), dp_z, 
                 angle_T1_dp_xy, 
-                np.linalg.norm(T1_xy_flipped, axis=1), T1_z, 
+                #np.linalg.norm(T1_xy_flipped, axis=1), T1_z, 
+                np.linalg.norm(T1_xy, axis=1), T1_z, 
                 np.linalg.norm(T2_xy, axis=1), T2_z, angle_T1_T2_xy, 
                 angle_v1_dp_xy, 
                 np.linalg.norm(v1_xy, axis=1), v1_z, 
                 np.linalg.norm(v2_xy, axis=1), v2_z, angle_v1_v2_xy,
-                np.linalg.norm(f_xy, axis=1), f_z, angle_f_dp_xy
+                np.linalg.norm(dw_xy, axis=1), f_z, angle_dw_dp_xy
             )
 
     # returns |[dp]xy|, [dp]z, 
@@ -2358,7 +2375,7 @@ def equivariant_agile_transform(u1_states, u2_states):
     # |[v1]xy|, [v1]z, 
     # |[v2]xy|, [v2]z, angle_xy(v1,v2)
     # [f]xy, [f]z, angle_xy(f, dp)
-    return np.column_stack(result)
+    return np.column_stack(result), None #flipped_idx
 
 
 def continous_transform(equivariant_states):
@@ -2370,9 +2387,11 @@ def continous_transform(equivariant_states):
     v1_decomp = angle_demcomposition(equivariant_states[:,8], equivariant_states[:,9])
     v2_decomp = angle_demcomposition(equivariant_states[:,13], equivariant_states[:,11])
 
-    f_decomp = angle_demcomposition(equivariant_states[:,16], equivariant_states[:,14])
+    dw_decomp = angle_demcomposition(equivariant_states[:,16], equivariant_states[:,14])
 
-    dw_decomp = f_decomp - T2_decomp
+    #print("continous_transf.dw_decomp", dw_decomp[:3])
+
+    #dw_decomp = f_decomp - T2_decomp
 
 
 
@@ -2430,7 +2449,10 @@ def process_vectors(vectors1, vectors2, vectors3):
     vectors3[v1_colin_and_v3_left] = mirror_vectors(vectors3[v1_colin_and_v3_left], 
                                                    vectors2[v1_colin_and_v3_left])
 
-    return vectors1, vectors2, vectors3
+
+    # summarize where lower vector vector 3, has been mirrored
+    mask3 = mask | v1_colin_and_v3_left
+    return vectors1, vectors2, vectors3, mask
 
 
 # triginometric
@@ -2494,8 +2516,10 @@ def euler_angles_to_quaternion(roll, pitch, yaw):
     return w, x, y, z
 
 
-def normalize_vector(v, epsilon=1e-6):
+def normalize_vector(v, epsilon=1e-12):
     norm = np.linalg.norm(v, axis=-1, keepdims=True)  # Compute norm along the last axis
+    
+        
     return np.where(norm < epsilon, np.full_like(v, epsilon), v / norm)  # Handle small vectors
 
 
@@ -2504,38 +2528,74 @@ def orthogonal_projection(dp_xy, dw_xy_rel):
     # projects dw onto dp as if dp were (1,0)
     e_x = normalize_vector(dp_xy)
 
-    print("e_x", e_x)
+    #print("e_x", e_x)
     e_y = np.stack([-e_x[:, 1], e_x[:, 0]], axis=1)
-    print("e_y", e_y)
+    #print("e_y", e_y)
 
     #print("dw_xy_rel",dw_xy_rel)
 
-    print("dp",dp_xy)
-    print("dw_xy_rel", dw_xy_rel)
+    #print("orthogonal_prog.dw_xy_rel", dw_xy_rel)
+    #print("orthogonal_proj.dp",dp_xy)
 
+    dw_abs = dw_xy_rel[:,0:1] * e_x + dw_xy_rel[:,1:2] * e_y
+
+    #print("orthogonal_proj.dw_abs", dw_abs)
     
-    return dw_xy_rel[:,0:1] * e_x + dw_xy_rel[:,1:2] * e_y
+    return dw_abs
 
 
 
 
 
-T = np.array([[0.0,1.0], [-1.0,1.0],])
+# T = [[0.0,1.0], [-1.0,1.0]
 
-dp = np.array([[0.0,3.0],[0.0,3.0]])
+# dp = [[0.0,3.0],[0.0,3.0]]
 
-signed_angles = compute_signed_angles(dp, T)
+# signed_angles = compute_signed_angles(dp, T)
 
-print("angles", (180.0/np.pi) * signed_angles)
+# print("angles", (180.0/np.pi) * signed_angles)
 
-print("magnitudes",np.linalg.norm(T, axis=1))
-decomp = angle_demcomposition(signed_angles, np.linalg.norm(T, axis=1))
+# print("magnitudes",np.linalg.norm(T, axis=1))
+# decomp = angle_demcomposition(signed_angles, np.linalg.norm(T, axis=1))
 
-print("decomp", decomp)
+# print("decomp", decomp)
 
 
 
-#magn = normalize_vector(T)
-#print("Normalized", magn)
-print("proj", orthogonal_projection(dp, decomp))
+# #magn = normalize_vector(T)
+# #print("Normalized", magn)
+# print("proj", orthogonal_projection(dp, decomp))
 
+
+
+
+class NormalizedMSELoss(torch.nn.Module):
+
+    def __init__(self, sigmas=[1.0, 1.0, 15.0]):
+        super().__init__()
+        self.sigmas = torch.tensor(sigmas)
+
+    def forward(self, pred, target):
+        normalized_error = (pred - target) / self.sigmas.to(pred.device)  
+        return torch.mean(normalized_error ** 2)  
+
+class WeightedMSELoss(torch.nn.Module):
+    def __init__(self, weight_x=5.0, weight_y=5.0, weight_z=1.0):
+        super(WeightedMSELoss, self).__init__()
+        self.weight_x = weight_x
+        self.weight_y = weight_y
+        self.weight_z = weight_z
+
+    def forward(self, predictions, targets):
+        pred_x, pred_y, pred_z = predictions[:, 0], predictions[:, 1], predictions[:, 2]
+        target_x, target_y, target_z = targets[:, 0], targets[:, 1], targets[:, 2]
+
+        
+        mse_x = torch.mean((pred_x - target_x) ** 2)
+        mse_y = torch.mean((pred_y - target_y) ** 2)
+        mse_z = torch.mean((pred_z - target_z) ** 2)
+
+        
+        weighted_mse = self.weight_x * mse_x + self.weight_y * mse_y + self.weight_z * mse_z
+
+        return weighted_mse
