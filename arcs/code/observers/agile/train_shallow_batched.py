@@ -1,5 +1,5 @@
 
-import torch, sys
+import torch, sys, argparse
 from model import AgileShallowPredictor
 from dataset import AgileContinousDataset
 from torch.utils.data import Dataset, DataLoader
@@ -12,24 +12,38 @@ sys.path.append('../../utils/')
 
 from utils import *
 
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
+    parser.add_argument("--epochs", type=int, default=30, help="Number of epochs")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--sn_gamma", type=float, default=None, help="SN constant")
+    parser.add_argument("--save_model", type=bool, default=False, help="Save trained model")
+    return parser.parse_args()
+
+args = parse_args()
+
+# Use parsed arguments in training script
+
+lr = args.lr
+n_epochs = args.epochs
+batch_size = args.batch_size
+sn_gamma = args.sn_gamma
+SAVE_MODEL = args.save_model
+
+
 #sys.path.append('../../../../../notify/')
 #from notify_script_end import notify_ending
 
-SAVE_MODEL = True
-load_model = None
+
 
 #seed = 123
 #torch.manual_seed(seed)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 50
-
-lr = 3e-4
-#sn_gamma = 4 # scale factor for spectral normalization
-sn_gamma = None
-
-
-model_name = f"Agile-Shallow-batched-sn-{str(sn_gamma)}-123S"
+model_name = f"agl_bs_{batch_size}_sn_{str(sn_gamma)}_lr_{lr}_ep{str(n_epochs)}"
 
  
 
@@ -117,13 +131,7 @@ def train():
         find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz"),
     ])
     
-    dataset_eval = AgileContinousDataset([
-        find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz"),
-        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz"),
-        find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz"),
-        find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len20802ts_67_iterations_testset.npz"),
-    ])
-
+    
     
 
     # Data preparation
@@ -132,15 +140,12 @@ def train():
     
 
 
-    train_data, val_data = train_test_split(dataset,test_size=0.25, shuffle=True)
-
-    batch_size = 32
+    train_data, val_data = train_test_split(dataset, test_size=0.25, shuffle=True, random_state=args.seed)
 
 
-
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=False)
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
-    eval_loader = DataLoader(dataset_eval, batch_size=batch_size, shuffle=False)
+    
 
     
     
@@ -197,17 +202,7 @@ def train():
     #plot_z_slices(model)
     #plot_3D_forces(model)
 
-    actuals, predictions = evaluate_nn(model, eval_loader)
-
-    # Plot results
-    plt.figure(figsize=(10, 6))
-    plt.plot(actuals, label="True Forces", linewidth=2)
-    plt.plot(predictions, label="Predicted Forces", linewidth=2, linestyle="--")
-    plt.xlabel("Time Step")
-    plt.ylabel("Force")
-    plt.title("True vs Predicted Disturbance Forces")
-    plt.legend()
-    plt.show()
+    
 
 
 

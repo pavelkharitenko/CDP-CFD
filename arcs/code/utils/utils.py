@@ -11,6 +11,16 @@ from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 from scipy.spatial.transform import Rotation as R
 
+# Set global font size
+plt.rcParams.update({
+    "font.size": 10,  # Default font size for text
+    "axes.titlesize": 10,  # Title font size
+    "axes.labelsize": 10,  # Axis label font size
+    "xtick.labelsize": 8,  # X-axis tick label font size
+    "ytick.labelsize": 8,  # Y-axis tick label font size
+    "legend.fontsize": 8,  # Legend font size
+})
+
 
 sys.path.append('../../uav/')
 from uav import *
@@ -1273,7 +1283,8 @@ def sample_from_range(lower,upper):
 def extract_and_plot_data(data_set_paths=None, 
                           predictors=[], 
                           time_seq=None, uav_1_states=None, uav_2_states=None, 
-                          plot=False, roll_iterations=True, save=False):
+                          plot=False, roll_iterations=True, save=False,
+                          data_name="no_data_name"):
     """
     After collecting agile flight data, plot, evaluate and save uav states as dataset.
     """
@@ -1306,7 +1317,7 @@ def extract_and_plot_data(data_set_paths=None,
     u2_rps_rot = zip(u2_avg_rps, u2_rotations)
 
     
-    overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 10.6)[0]
+    overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 0.8)[0]
     overlaps = np.array(time_seq)[overlap_indices]
 
     # 2 compute uav actual forces, smooth them, and compute controller z-axis forces, and their residual disturbance
@@ -1316,62 +1327,29 @@ def extract_and_plot_data(data_set_paths=None,
     u2_thrusts = [u2_rotations.apply([0, 0, rps_to_thrust_p005_mrv80(avg_rps)])[2] + (g*mass) for (avg_rps, u2_rotations) in u2_rps_rot]
     u2_z_dw_forces = smoothed_u2_z_forces - u2_thrusts
 
-    
-    model_paths = [
-        #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\ndp\2024-11-20-13-11-05-NDP-predictor-sn_scale-4-300k-ts-flyby-navy-sill20000_eps.pth",
-        #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\SO2\2024-11-20-00-10-30-SO2-Model-below-sn_scale-None-gray-javelin20000_eps.pth",
-        #r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\observers\SO2\2024-11-20-12-30-17-SO2-Model-below-sn_scale-4-dull-flow20000_eps.pth",
-    ]
-    models = []
-
-    # colors= ["green", "yellow", "red"]
-
-    # model = DWPredictor()
-    # model.load_state_dict(torch.load(model_paths[0], weights_only=True))
-    # models.append(model)
-
-    # model = ShallowEquivariantPredictor()
-    # model.load_state_dict(torch.load(model_paths[1], weights_only=True))
-    # models.append(model)
-
-    # model = ShallowEquivariantPredictor()
-    # model.load_state_dict(torch.load(model_paths[2], weights_only=True))
-    # models.append(model)
 
 
-    # predictions = evaluate_zy_force_curvature(models, np.array(rel_state_vector_list)[:,:6])
-    # labels = [ 
-    #     "NDP new data SN<4 ", 
-    #     "SO2-Equiv.", 
-    #     "SO2-Equiv. SN<4", 
-    # ]
-
-
-
-    # # 3 plot if needed
-    # if plot:
-    #     fig = plt.subplot()
-    #     #fig.plot(u2_z_forces, label="UAV's z-axis forces") # unsmoothed
-    #     plot_array_with_segments(fig, time_seq, smoothed_u2_z_forces, color="blue", roll=roll_iterations, label="UAV total Z-forces")
-    #     plot_array_with_segments(fig, time_seq, u2_thrusts,  color="orange", roll=roll_iterations, label="controller z-forces")
-    #     plot_array_with_segments(fig, time_seq, u2_z_dw_forces, color="magenta", roll=roll_iterations, label="downwash disturbance forces", overlaps=overlaps)
+    # 3 plot if needed
+    if plot:
+        fig = plt.subplot()
+        #fig.plot(u2_z_forces, label="UAV's z-axis forces") # unsmoothed
+        plot_array_with_segments(fig, time_seq, smoothed_u2_z_forces, color="blue", roll=roll_iterations, label="UAV total Z-forces")
+        plot_array_with_segments(fig, time_seq, u2_thrusts,  color="orange", roll=roll_iterations, label="controller z-forces")
+        plot_array_with_segments(fig, time_seq, u2_z_dw_forces, color="magenta", roll=roll_iterations, label="downwash disturbance forces", overlaps=overlaps)
         
-    #     # evaluate predictors
-    #     for idx, prediction in enumerate(predictions):
-    #         plot_array_with_segments(fig, time_seq, prediction[:,2], roll=roll_iterations, color=colors[idx], label=labels[idx])
-    #         compute_rmse(prediction[:,2][overlap_indices], u2_z_dw_forces[overlap_indices],label=labels[idx])
-            
-        
-        
+        # evaluate predictors
+        #for idx, prediction in enumerate(predictions):
+        #    plot_array_with_segments(fig, time_seq, prediction[:,2], roll=roll_iterations, color=colors[idx], label=labels[idx])
+        #    compute_rmse(prediction[:,2][overlap_indices], u2_z_dw_forces[overlap_indices],label=labels[idx])
 
 
+        plt.ylabel("Force [N]")
+        plt.xlabel("time [s]")
+        plt.grid()
+        plt.title("Actual bottom UAV Z-forces, controller's thrust, and residual downwash force")
+        plt.legend()
+        plt.show()
 
-    #     plt.ylabel("Force [N]")
-    #     plt.xlabel("time [s]")
-    #     plt.grid()
-    #     plt.title("Actual bottom UAV Z-forces, controller's thrust, and residual downwash force")
-    #     plt.legend()
-    #     plt.show()
 
 
 
@@ -1385,10 +1363,46 @@ def extract_and_plot_data(data_set_paths=None,
     reset_indices = np.append(reset_indices, len(time_seq))  # Include the end of the array as the last boundary
     n_itrs = len(reset_indices)
     if save:
-        np.savez(f"raw_data_3_swapping_fast_200Hz_80_005_len{len(uav_1_states)}ts_{n_itrs}_iterations", 
+        np.savez(f"{data_name}_200Hz_80_005_len{len(uav_1_states)}ts_{n_itrs}_iterations", 
                  uav_1_states=uav_1_states, 
                  uav_2_states=uav_2_states, 
-                 dw_forces=u2_z_dw_forces)
+                 dw_forces=u2_z_dw_forces,
+                 time=time_seq)
+
+
+def load_scenario_data(dataset_path):
+    uav_1_states = []
+    uav_2_states = []
+    time_seq = []
+    
+    data = np.load(dataset_path)
+    uav_1_states, uav_2_states, time_seq = data['uav_1_states'], data['uav_2_states'], data['time']
+    u2_z_dw_forces, overlap_indices, overlaps = extract_data(uav_1_states, uav_2_states, time_seq)
+
+    return u2_z_dw_forces, overlap_indices, overlaps, time_seq
+
+
+def create_demo_figure_1(dataset_path):
+
+    u2_z_dw_forces, overlap_indices, overlaps, time_seq = load_scenario_data(dataset_path)
+    fig = plt.subplot()
+    plot_figure_1_segments(fig, time_seq, u2_z_dw_forces, 
+                             overlaps=overlaps,
+                             color="magenta", roll=True, 
+                             label="downwash disturbance forces"
+    )
+
+    
+
+
+def create_demo_subfigure_1(path1, path2):
+
+    u2_z_dw_forces1, overlap_indices1, overlaps1, time1 = load_scenario_data(path1)
+    u2_z_dw_forces2, overlap_indices2, overlaps2, time2 = load_scenario_data(path2)
+
+    plot_multiple_segments(time1, u2_z_dw_forces1, time2, u2_z_dw_forces2, overlaps1=overlaps1, overlaps2=overlaps2)
+
+
 
 
 def extract_data(uav_1_states, uav_2_states, time_seq):
@@ -1401,7 +1415,7 @@ def extract_data(uav_1_states, uav_2_states, time_seq):
     u2_rps_rot = zip(u2_avg_rps, u2_rotations)
 
 
-    overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 3.5)[0]
+    overlap_indices = np.where(np.abs(np.array(uav_1_states)[:,1] - np.array(uav_2_states)[:,1]) < 0.8)[0]
     overlaps = np.array(time_seq)[overlap_indices]
 
     # 2 compute uav actual forces, smooth them, and compute controller z-axis forces, and their residual disturbance
@@ -1598,9 +1612,123 @@ def plot_array_with_segments(fig, time, array, roll=True, color=None, label=None
     
         for line_time in overlaps:
             if line_time in time:  # Ensure the line time exists in the time array
-                fig.axvline(line_time, color='grey', linestyle='--', alpha=0.1)
+                fig.axvline(line_time, color='black', linestyle='--', alpha=0.1)
+
+def plot_figure_1_segments(fig, time, array, roll=True, color=None, label=None, overlaps=[]):
+    # Find the indices where the time array decreases (reset points)
+    reset_indices = np.where(np.diff(time) < 0)[0] + 1  # Add 1 to shift to the start of the next segment
+    reset_indices = np.append([0], reset_indices)  # Include the start of the array as the first segment boundary
+    reset_indices = np.append(reset_indices, len(time))  # Include the end of the array as the last boundary
+    
+    segments = []
+    for i in range(len(reset_indices) - 1):
+        start, end = reset_indices[i], reset_indices[i + 1]
+        segment_time = time[start:end]
+        segment_data = array[start:end]
+        segments.append((segment_time, segment_data))
+        #fig.plot(segment_time, segment_data, color=color)
+
+    segments = segments[:-1] # remove last
+    # Step 1: common time grid
+    min_time = min(np.min(x) for x, y in segments)
+    max_time = max(np.max(x) for x, y in segments)
+    common_time = np.linspace(min_time, max_time, num=100)  # Adjust num for resolution
+    vertical_timestamps = overlaps
+
+    # 2 interpolate each dataset onto the common time grid
+    interpolated_data = []
+    for x, y in segments:
+        f = interp1d(x, y, kind='linear', fill_value="extrapolate")
+        interpolated_data.append(f(common_time))
+
+    interpolated_data = np.array(interpolated_data)
+
+    # 3 compute the average and standard deviation
+    average_line = np.mean(interpolated_data, axis=0)
+    std_dev = np.std(interpolated_data, axis=0)
+
+    # for debug: plot actual data
+    #for i, (x, y) in enumerate(segments):
+    #    plt.plot(x, y, label=f'Dataset {i+1}', linestyle='--', alpha=0.7)
+
+    # 4 plot the results
+    plt.figure(figsize=(10, 6))
+    plt.plot(common_time, average_line, label='Average', color='blue')
+    plt.fill_between(common_time, average_line - std_dev, average_line + std_dev, color='lightblue', alpha=0.5, label='Standard Deviation')
+    max_line_time = np.max(overlaps)
+    plt.axvline(max_line_time, color='black', linestyle='--')
+    min_line_time = np.min(overlaps)
+    plt.axvline(min_line_time, color='black', linestyle='--')
+    plt.xlabel('Time')
+    plt.ylabel('Data')
+    plt.title('Average Line and Standard Deviation Over Time')
+    plt.legend()
+    plt.grid(True)
+    
+def plot_subfigure_1_segments(ax, time, array, roll=True, color=None, label=None, overlaps=[]):
+    reset_indices = np.where(np.diff(time) < 0)[0] + 1
+    reset_indices = np.append([0], reset_indices)
+    reset_indices = np.append(reset_indices, len(time))
+    
+    segments = []
+    for i in range(len(reset_indices) - 1):
+        start, end = reset_indices[i], reset_indices[i + 1]
+        segment_time = time[start:end]
+        segment_data = array[start:end]
+        segments.append((segment_time, segment_data))
+
+    segments = segments[:-1]  # Remove last segment
+
+    min_time = min(np.min(x) for x, y in segments)
+    max_time = max(np.max(x) for x, y in segments)
+    common_time = np.linspace(min_time, max_time, num=100)
+
+    interpolated_data = []
+    for x, y in segments:
+        f = interp1d(x, y, kind='linear', fill_value="extrapolate")
+        interpolated_data.append(f(common_time))
+
+    interpolated_data = np.array(interpolated_data)
+    average_line = np.mean(interpolated_data, axis=0)
+    std_dev = np.std(interpolated_data, axis=0)
+
+    ax.plot(common_time, average_line, label='Avg. Force', color='blue')
+    ax.fill_between(common_time, average_line - std_dev, average_line + std_dev, color='lightblue', alpha=0.5, label='Std. of Force')
+    
+    if len(overlaps) != 0:
+        ax.axvline(np.max(overlaps), color='black', linestyle='--')
+        ax.axvline(np.min(overlaps), color='black', linestyle='--')
+
+    #ax.set_xlabel('Time [s]')
+    #ax.set_ylabel('Forces [N]')
+    ax.legend()
+    ax.grid(True)
+
+def plot_multiple_segments(time1, array1, time2, array2, overlaps1=[], overlaps2=[]):
+    fig, axes = plt.subplots(nrows=2, figsize=(3.5, 2.5), sharex=True)  # Two vertically stacked subplots
+
+    # Plot first dataset
+    axes[0].set_title('Bottom UAV external forces in Z-axis')
+    plot_subfigure_1_segments(axes[0], time1, array1, overlaps=overlaps1)
+
+    # Plot second dataset
+    #axes[1].set_title('Dataset 2')
+    plot_subfigure_1_segments(axes[1], time2, array2, overlaps=overlaps2)
+
+    ylim = axes[0].get_ylim()  # Get y-axis limits from the first plot
+    axes[1].set_ylim(ylim)  # Apply them to the second plot
+    axes[1].legend().set_visible(False)
 
 
+    plt.tight_layout()
+    #plt.ylabel('Forces [N]')
+    plt.xlabel('Time [s]')
+    fig.text(0.02, 0.5, 'Forces [N]', va='center', rotation='vertical')
+    #handles, labels = axes[0].get_legend_handles_labels()
+    #fig.legend(handles, labels, loc='upper right')  # Single legend for both subplots
+    #plt.show()
+    plt.savefig("single_column_figure.pdf", format="pdf", bbox_inches="tight")
+    plt.close()
 
 def compute_rmse(array1, array2, label=None):
     rmse = np.sqrt(np.mean((array1 - array2) ** 2))
@@ -1682,24 +1810,57 @@ def find_file_with_substring(substring):
     return None
 
 
-def compute_metrics(y_true, y_pred):
+def compute_metrics(y_true, y_pred, nrmse_normalization="mean"):
     """
     Compute RMSE, NRMSE, MAE, and R2 score between true and predicted values.
+    
     Args:
-        y_true (array): Ground truth values.
-        y_pred (array): Predicted values.
+        y_true (array-like): Ground truth values.
+        y_pred (array-like): Predicted values.
+        nrmse_normalization (str): Method to normalize RMSE for NRMSE. Options:
+            - "mean": Normalize by the mean of y_true.
+            - "range": Normalize by the range (max - min) of y_true.
+            - "std": Normalize by the standard deviation of y_true.
+            - "sqrt_mean_squared": Normalize by the square root of the mean squared y_true.
+    
     Returns:
         dict: A dictionary with RMSE, NRMSE, MAE, and R2 score.
     """
+    # Input validation
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    
+    if y_true.shape != y_pred.shape:
+        raise ValueError("y_true and y_pred must have the same shape.")
+    
+    if len(y_true) == 0:
+        raise ValueError("Input arrays must not be empty.")
+    
+    # Compute RMSE
     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    #nrmse_range = rmse / (np.max(y_true) - np.min(y_true))  # Range-normalized RMSE
-    nrmse_range = rmse / np.mean(y_true)  # Range-normalized RMSE
-
+    
+    # Compute NRMSE based on the chosen normalization method
+    if nrmse_normalization == "mean":
+        normalization_factor = np.mean(y_true)
+    elif nrmse_normalization == "range":
+        normalization_factor = np.max(y_true) - np.min(y_true)
+    elif nrmse_normalization == "std":
+        normalization_factor = np.std(y_true)
+    elif nrmse_normalization == "sqrt_mean_squared":
+        normalization_factor = np.sqrt(np.mean(y_true**2))
+    
+    if normalization_factor == 0:
+        raise ValueError("Normalization factor is zero. Cannot compute NRMSE.")
+    
+    nrmse = rmse / normalization_factor
+    
+    # Compute MAE and R2
     mae = mean_absolute_error(y_true, y_pred)
     r2 = r2_score(y_true, y_pred)
+    
     return {
         "RMSE": rmse,
-        "NRMSE (Mean)": nrmse_range,
+        f"NRMSE ({nrmse_normalization})": nrmse,
         "MAE": mae,
         "R2 Score": r2
     }
@@ -2599,3 +2760,4 @@ class WeightedMSELoss(torch.nn.Module):
         weighted_mse = self.weight_x * mse_x + self.weight_y * mse_y + self.weight_z * mse_z
 
         return weighted_mse
+    

@@ -21,11 +21,12 @@ def main(controller):
 
     # exp specific
     SAVE_EXP = True
-    SIM_MAX_DURATION = 600.0
+    dataset_name = "demo_1_flyabove"
+    SIM_MAX_DURATION = 120.0
 
     SAVE_INTERVALL = 6.0
     # episode specific
-    HOVER_DURATION = 3.0
+    HOVER_DURATION = 15.0
     ITERATION_TIME = HOVER_DURATION + 2.5
     exp_name = init_experiment(MANUEVER_NAME)
     total_iterations = 0
@@ -55,19 +56,19 @@ def main(controller):
 
    
 
-    next_way_point_uav_1 = [0.0,-1.5,1.5] # uav 1 hover at (0,-1,0.7)
+    
     yaw_uav_1 = 4.71238898038469
     yaw_uav_2 = 1.570796
 
     # sample initial z-position for uav 2
-    y_vel_max = 2.0
-    y_vel_min = 0.5
-    y_pos_max = -2.0
-    initial_point = sample_3d_point(-1.0) # returns at negative side a point p=[N(), N(), N()]
+    y_vel_max = 1.5#2.0
+    y_vel_min = 1.5#0.5
+    y_pos_max = -3.5
+    initial_point = np.array((0.0,0.0,1.5))#sample_3d_point(-1.0) # returns at negative side a point p=[N(), N(), N()]
     sampled_y_vel = -1.0*sample_from_range(y_vel_min,y_vel_max)
-    initial_y_pos = 1.5 + sampled_y_vel*0.2
+    initial_y_pos = 2.5#1.5 + sampled_y_vel*0.2
     selected_velocities.append(sampled_y_vel)
-    ITERATION_TIME = HOVER_DURATION + 10.0/-sampled_y_vel
+    ITERATION_TIME = HOVER_DURATION + 10.0/-sampled_y_vel + 2.5
 
     px4_input_1 = (0.0, initial_point[0], initial_y_pos, initial_point[2] + 0.5, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan) # uav 2 hover at (x,0,z)
     px4_input_2 = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, yaw_uav_2, nan) # uav 2 hover at (0,0,0)
@@ -134,10 +135,9 @@ def main(controller):
             print("-----------------------------------------")
 
             # init next iteration
-            
-            initial_point = sample_3d_point(-1.0) # returns at negative side a point p=[N(), N(), N()]
+            initial_point = np.array((0.0,0.0,1.5))#sample_3d_point(-1.0) # returns at negative side a point p=[N(), N(), N()]
             sampled_y_vel = -1.0*sample_from_range(y_vel_min,y_vel_max)
-            initial_y_pos = 1.5 + sampled_y_vel*0.2
+            initial_y_pos = 2.5#1.5 + sampled_y_vel*0.2
             selected_velocities.append(sampled_y_vel)
             ITERATION_TIME = HOVER_DURATION + 10.0/-sampled_y_vel
 
@@ -153,11 +153,10 @@ def main(controller):
             print("### Sampled Velocity:", sampled_y_vel)
             print("beginning iteration at global time",np.round(curr_sim_time,2))
 
-            time.sleep(0.1)
+            
             controller.clear()
-            time.sleep(0.1)
             controller.start()
-            time.sleep(0.1)
+            
 
 
 
@@ -176,41 +175,11 @@ def main(controller):
 
 
 
-    extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=False, save=SAVE_EXP)
-    #extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=True)
+    extract_and_plot_data(None, None, np.array(time_seq), uav_1.states, uav_2.states,plot=True, roll_iterations=False, save=SAVE_EXP,
+                          data_name=dataset_name)
     
-    # torque debug
     
-    yaw, pitch, roll = np.array(uav_2.states)[:,9], np.array(uav_2.states)[:,10], np.array(uav_2.states)[:,11]
-    to_deg = 180/np.pi
-    plot_uav_angles(time_seq, roll*to_deg, pitch*to_deg, yaw*to_deg - 90.0, "Roll pitch yaw orientations measured from IMU (angles) correct")
-    
-    # compute controller torques
-    u_rollpitchyaw_torques = np.array([(compute_torques(r1r2r3r4[0], r1r2r3r4[1],r1r2r3r4[2],r1r2r3r4[3]))
-                                        for r1r2r3r4 in np.array(uav_2.states)[:,22:26]])
-    
-    # compute gyroscopic torque
-    w_rpy = np.array(np.array(uav_2.states)[:,12:15])
-    gyroscopic_torque = np.array([np.cross(uav_2.inertia_matrix_complete @ w, w) for w in w_rpy])
-    u_rollpitchyaw_torques_no_gyroscopic_torques = u_rollpitchyaw_torques - gyroscopic_torque
-    
-    # compute actual torques of uav
-    actual_rollpitchyaw_torques = np.array([uav_2.inertia_matrix_complete @ w_xyz_dot for w_xyz_dot in np.array(uav_2.states)[:,15:18]])
-    
-    plot_uav_angles(time_seq, gyroscopic_torque[:,0], gyroscopic_torque[:,1], gyroscopic_torque[:,2], "gyroscopic torques")
-    
-    plot_uav_angles(time_seq, u_rollpitchyaw_torques[:,0], u_rollpitchyaw_torques[:,1], u_rollpitchyaw_torques[:,2],
-                    "controller input torques roll pitch yaw, computed from rotor speed differences (maybe wrong)")
-    
-    plot_uav_angles(time_seq, u_rollpitchyaw_torques_no_gyroscopic_torques[:,0], u_rollpitchyaw_torques_no_gyroscopic_torques[:,1], u_rollpitchyaw_torques_no_gyroscopic_torques[:,2],
-                    "controller input torques (from rotor speeds) without gyroscopic torque")
-    plot_uav_angles(time_seq, actual_rollpitchyaw_torques[:,0], actual_rollpitchyaw_torques[:,1],actual_rollpitchyaw_torques[:,2],
-                    "UAV total torques Roll pitch yaw, computed from IMU and inertia matrix (correct)")
-    plot_uav_angles(time_seq, smooth_with_savgol(actual_rollpitchyaw_torques[:,0], window_size=21, poly_order=1),
-                     smooth_with_savgol(actual_rollpitchyaw_torques[:,1], window_size=31, poly_order=1),
-                     smooth_with_savgol(actual_rollpitchyaw_torques[:,2], window_size=31, poly_order=1),
-                    "Smoothed UAV total torques Roll pitch yaw, computed from IMU and inertia matrix (correct)")
-    
+
     plt.show()
 
 

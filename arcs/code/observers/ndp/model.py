@@ -5,7 +5,7 @@
 #----------------------------------
 import torch
 import torch.nn as nn
-
+import numpy as np
 
 # input format: x = [pos_rel, vel_rel] (relative state vector)
 # output format: y = f_dw_pred xyz-force of downwash
@@ -30,10 +30,11 @@ class DWPredictor(nn.Module):
         return self.linear_relu_stack(x)
     
 
-    def evaluate(self, rel_state_vectors):
+    def evaluate(self, uav1_states, uav2_states):
         """
         From R:6 (rel_pos, rel_vel) to R:3 (dw_x, dw_y, dw_z) 
         """
+        rel_state_vectors = np.array(uav1_states)[:,:6] - np.array(uav2_states)[:,:6]
         with torch.no_grad():
             inputs = torch.tensor(rel_state_vectors).to(torch.float32)
             dw_forces = self.forward(inputs)
