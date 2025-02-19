@@ -1,27 +1,56 @@
-import numpy as np
-import torch
-import torch.nn as nn
+import torch, sys, argparse
+from model import DWPredictor
+from dataset import DWDataset
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
-
 import matplotlib.pyplot as plt
 import random
-from dataset import *
-from model import DWPredictor
+import numpy as np
+import os
 
 sys.path.append('../../utils/')
 from utils import *
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--epochs", type=int, default=20, help="Number of epochs")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
+    parser.add_argument("--sn_gamma", type=float, default=None, help="SN constant")
+    parser.add_argument("--save_model", type=bool, default=False, help="Save trained model")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    return parser.parse_args()
+
+args = parse_args()
+
+# Set seeds for reproducibility
+seed = args.seed
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
+
+# Use parsed arguments in training script
+lr = args.lr
+n_epochs = args.epochs
+batch_size = args.batch_size
+sn_gamma = args.sn_gamma
+SAVE_MODEL = args.save_model
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
+model_name = f"ndp_bs_{batch_size}_sn_{str(sn_gamma)}_lr_{lr}_ep{str(n_epochs)}_seed_{seed}"
 
-
-
-# --- Step 4: Training Function ---
-def train_nn(model, train_loader, val_loader, optimizer, criterion, epochs=20):
+def train_nn_with_validation(model, train_loader, val_loader, optimizer, criterion, epochs=20, patience=5):
+    model.train()
     tr_losses = []
     val_losses = []
-    model.train()
+    
+    best_val_loss = float('inf')  
+    best_model_weights = None     # store the best model weights
+    epochs_without_improvement = 0  # counter for early stopping
+
     for epoch in range(epochs):
+        model.train()  # Ensure the model is in training mode
         total_loss = 0.0
         for inputs, targets in train_loader:
             inputs = inputs.to(device)
@@ -32,16 +61,38 @@ def train_nn(model, train_loader, val_loader, optimizer, criterion, epochs=20):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss/len(train_loader):.6f}")
         
-        tr_losses.append(total_loss/len(train_loader))
-        val_losses.append(test_nn(model, val_loader))
-    return tr_losses, val_losses
+        # Compute training loss for the epoch
+        train_loss = total_loss / len(train_loader)
+        tr_losses.append(train_loss)
+        print(f"Epoch [{epoch+1}/{epochs}], Training Loss: {train_loss:.6f}")
 
-# --- Step 5: Evaluation Function ---
-def test_nn(model, eval_loader):
+        # Compute validation loss for the epoch
+        val_loss = test_nn(model, val_loader, criterion)
+        val_losses.append(val_loss)
+
+        # ckeck for improvement in validation loss
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_model_weights = model.state_dict()  
+            epochs_without_improvement = 0  
+        else:
+            epochs_without_improvement += 1
+
+        # do early stopping check
+        if epochs_without_improvement >= patience:
+            print(f"Early stopping at epoch {epoch+1} (no improvement for {patience} epochs).")
+            break
+
+    # Restore the best model weights
+    if best_model_weights is not None:
+        model.load_state_dict(best_model_weights)
+        print("Restored model weights from the best epoch.")
+
+    return tr_losses, val_losses, epoch
+
+def test_nn(model, eval_loader, criterion):
     model.eval()
-
     with torch.no_grad():
         total_loss = 0.0
         for inputs, targets in eval_loader:
@@ -50,120 +101,62 @@ def test_nn(model, eval_loader):
             outputs = model(inputs)
             loss = criterion(outputs, targets)
             total_loss += loss.item()
-
-    
     print(f"Validation Loss: {total_loss/len(eval_loader):.6f}")
     return total_loss/len(eval_loader)
-    #print(f"Epoch Validation Loss: {total_loss:.6f}")
 
-
-# --- Step 5: Evaluation Function ---
 def evaluate_nn(model, eval_loader):
-
     model.eval()
     model.to("cpu")
     predictions = []
     actuals = []
-
     with torch.no_grad():
         for inputs, targets in eval_loader:
             outputs = model(inputs)
-            #print(outputs.numpy().shape)
             predictions.append(outputs.numpy())
             actuals.append(targets.numpy())
-            #print(len(predictions))
-
-    predictions = np.vstack(predictions)[:,2]
-    actuals = np.vstack(actuals)[:,2]
-
+    predictions = np.vstack(predictions)
+    actuals = np.vstack(actuals)
     mse = mean_squared_error(actuals, predictions)
     rmse = np.sqrt(mse)
     r2 = r2_score(actuals, predictions)
-
     print(f"Evaluation Results: RMSE: {rmse:.4f}, R²: {r2:.4f}")
     return actuals, predictions
 
-
-# --- Step 6: Main Script ---
-if __name__ == "__main__":
-    
-    SAVE_MODEL = True
-
-
-    n_epochs = 30
-    exp_name = init_experiment(f"NDP-batched-sn-None-123S")
-
-    # set seed
-    random.seed(2)
-    torch.manual_seed(2)
-    np.random.seed(2)
-
+def train():
+    exp_name = init_experiment(model_name)
     dataset = DWDataset([
         find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len7636ts_12_iterations.npz"),
         find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len65911ts_91_iterations.npz"),
         find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len60694ts_100_iterations.npz"),
         find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len56629ts_173_iterations.npz"),
         find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len68899ts_103_iterations.npz"),
-        ])
+    ])
     
-    dataset_eval = DWDataset([find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz"),
-        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz"),
-        find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz"),
-        find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len20802ts_67_iterations_testset.npz"),
-        ])
+    # Split dataset with a fixed seed
+    train_data, val_data = train_test_split(dataset, test_size=0.25, shuffle=True, random_state=seed)
+    
+    # seed for the DataLoader
+    g = torch.Generator()
+    g.manual_seed(seed)
 
-    # Data preparation
-
-   
-
-    train_data, val_data = train_test_split(dataset, test_size=0.25, shuffle=True)
-
-    batch_size = 64
-
-
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    # Create DataLoader with the generator
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, generator=g)
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
-    eval_loader = DataLoader(dataset_eval, batch_size=batch_size, shuffle=False)
+
+
+    model = DWPredictor().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
-    
+    criterion = torch.nn.MSELoss()
+    train_errors, val_errors, epochs = train_nn_with_validation(model, train_loader, val_loader, optimizer, criterion, epochs=n_epochs)
 
-
-    # Model initialization
-
-    model = DWPredictor()
-    model = model.to(device)
-
-    # Optimizer and loss function
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    criterion = NormalizedMSELoss()
-
-    # Train the model
-    print("Training model...")
-    train_errors, val_errors = train_nn(model, train_loader, val_loader, optimizer, criterion, epochs=n_epochs)
-
-    # Evaluate the model
-    print("Evaluating model...")
-    actuals, predictions = evaluate_nn(model, eval_loader)
-
-    # Plot results
-    plt.figure(figsize=(10, 6))
-    plt.plot(actuals, label="True Forces", linewidth=2)
-    plt.plot(predictions, label="Predicted Forces (NNARX)", linewidth=2, linestyle="--")
-    plt.xlabel("Time Step")
-    plt.ylabel("Force")
-    plt.title("True vs Predicted Disturbance Forces")
-    plt.legend()
-    plt.show()
-
-    plot_NN_training(train_errors, val_errors)
-    model.eval()
-    #print(model(st))
-    #plot_xy_slices(model)
-    #plot_zy_yx_slices(model)
-    #plot_z_slices(model)
-    #plot_3D_forces(model)
-
-    final_model_name = exp_name + str(n_epochs) + "_eps"  + ".pth"
+    final_model_name = exp_name + str(epochs) + "_eps"  + ".pth"
     if SAVE_MODEL:
         print("Training finished, saving...", final_model_name)
         torch.save(model.state_dict(), final_model_name)
+
+    #plot_NN_training(train_errors, val_errors)
+
+    evaluate_model(model, visualize=False, eval_xyz=True)
+
+train()

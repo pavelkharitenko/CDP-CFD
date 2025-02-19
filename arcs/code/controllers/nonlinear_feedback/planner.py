@@ -49,8 +49,8 @@ class Planner:
         direction = self.end - self.start
         distance = np.linalg.norm(direction)
         direction = direction / distance
-        
-        total_time = distance / self.velocity
+
+        total_time = (distance / self.velocity) + self.acceleration_time
         num_waypoints = int(total_time / self.dt) + 1
         
         # Get a smooth acceleration profile
@@ -380,7 +380,7 @@ class Planner:
 
 
 
-    def adjust_waypoint(self, current_state, next_waypoint, alpha=0.9):
+    def adjust_waypoint(self, current_state, next_waypoint, alpha=1.0):
         current_position = current_state[:3]
         current_velocity = current_state[3:6]
         current_acceleration = current_state[6:9]

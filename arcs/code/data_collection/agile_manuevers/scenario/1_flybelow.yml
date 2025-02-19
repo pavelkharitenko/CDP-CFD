@@ -33,7 +33,7 @@
         initial_position:
         - 0
         - -2.5
-        - -2.1
+        - -1.75
         initial_rotation:
           angle_radians: 1.570796326794897
           axis:
@@ -52,7 +52,7 @@
     
   fluid:
     blocks:
-      max_block_count: 550
+      max_block_count: 750
     fluid:
       resolution: 0.05
       max_velocity: 80.0

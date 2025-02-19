@@ -188,14 +188,14 @@ class AnalyticalPredictor():
         return F_drag_total, T_drag_total
 
 
-    def evaluate(self, rel_states):
+    def evaluate(self, u1_states, u2_states):
         """
         From R:6 (rel_pos, rel_vel) to R:3 (0, 0, dw_z) 
         Only evaluates F_drag, T_drag unused but possible to account
         """
         predicted_forces = []
         
-
+        rel_states = u1_states[:,6:] - u2_states[:,6:]
         for u1_state in rel_states:
             u2_state = np.zeros(12)
             u1_state = np.pad(u1_state, (0, 12 - len(u1_state)), mode='constant', constant_values=0)
@@ -225,4 +225,60 @@ class AnalyticalPredictor():
 # ep(uav_1.states[state], uav_2.states[state])
 
 
+
+
+class AnalyticalPredictorVectorized():
+    def __init__(self, k1 = 1.0, k2 = 1.0, k3 = 1.0):
+        k1 = k1
+        k2 = k2
+        k3 = k3
+        self.Bd = 10.11
+        self.S = 0.07668 * k2
+        self.s0 = 3.0 * k3
+        self.Cd = 1.18
+        self.Ap = np.pi * 0.195**2 * k1
+        self.rho = 1.204
+        self.bias_yaw = np.pi / 2.0
+        self.l = 2.0 * 0.3
+        self.T_hover = 34.0 * k1 
+        self.U_hover = np.sqrt(self.T_hover / (2.0 * self.rho * self.Ap * 4.0))
+        
+        self.grid_points = np.array([[-0.03, 0.1305], [0.03, 0.1305], [0.0865, 0.0735], [0.0865, 0.0575], 
+                                      [0.07, 0.0375], [0.07, -0.0375], [0.0865, -0.0575], [0.0865, -0.0735], 
+                                      [0.026, -0.1305], [-0.026, -0.1305], [-0.0865, -0.0735], [-0.0865, -0.0575],
+                                      [-0.07, -0.0375], [-0.07, 0.0375], [-0.0865, 0.0575], [-0.0865, 0.0735]])
+        
+        self.x_cell_length = 0.02
+        self.y_cell_length = 0.02
+    
+    def U_flow(self, s, r):
+        s, r = s / self.l, r / self.l
+        U_c = self.Bd / (s - self.s0)
+        r_half = self.S * (s - self.s0) / self.l
+        r_tilde = r / r_half
+        U_c = U_c * self.U_hover / (1.0 + (np.sqrt(2.0) - 1.0) * r_tilde**2) ** 2
+        return U_c
+    
+    def F_drag(self, u1_states, u2_states):
+        u2_yaw = u2_states[:, 9] + self.bias_yaw
+        b2Rw = R.from_euler('xyz', np.column_stack((u2_states[:, 10], u2_states[:, 11], u2_yaw)), degrees=False).as_matrix()
+        rotated_grid = np.einsum('nij,mj->nmi', b2Rw, np.pad(self.grid_points, ((0, 0), (0, 1)), constant_values=0))
+        grid_positions = rotated_grid + u2_states[:, np.newaxis, :3]
+        torque_arm = grid_positions - u2_states[:, np.newaxis, :3]
+        
+        normal_vector = np.cross(b2Rw[:, :, 0], b2Rw[:, :, 1])
+        cosine_angle = np.abs(normal_vector[:, 2])
+        A_cell_xy_projected = self.x_cell_length * self.y_cell_length * cosine_angle[:, np.newaxis]
+        
+        r_dash = np.linalg.norm(u1_states[:, np.newaxis, :2] - grid_positions[:, :, :2], axis=2)
+        z_dash = u1_states[:, np.newaxis, 2] - grid_positions[:, :, 2]
+        f_cell = A_cell_xy_projected * 0.5 * self.Cd * self.rho * self.U_flow(z_dash, r_dash)**2
+        f_cell = np.stack((np.zeros_like(f_cell), np.zeros_like(f_cell), -f_cell), axis=-1)
+        
+        Force_total = np.sum(f_cell, axis=1)
+        Force_total = np.clip(Force_total, -30, 30)
+        return Force_total, np.zeros_like(Force_total)
+    
+    def evaluate(self, u1_states, u2_states):
+        return self.F_drag(u1_states, u2_states)[0]
 

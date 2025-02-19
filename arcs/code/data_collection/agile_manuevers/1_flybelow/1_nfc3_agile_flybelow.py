@@ -8,7 +8,7 @@ sys.path.append('../../../utils/')
 sys.path.append('../../../controllers/nonlinear_feedback')
 sys.path.append('../../../observers/')
 
-from agile.model import AgileShallowPredictor
+from agile.model import AgilePredictor
 from ndp.model import DWPredictor
 from controller3 import NonlinearFeedbackController3
 from planner import Planner
@@ -16,20 +16,19 @@ from planner import Planner
 from scipy.spatial.transform import Rotation as R
 
 
-
-
 from uav import *
 from utils import *
 
 def main(controller):
     # manuever specific
-    MANUEVER_NAME = "1_nfc3_flybelow"
+    MANUEVER_NAME = "1_flybelow_exp_agile"
+    dataset_name = MANUEVER_NAME
     port = 25556
     nan = float('NaN')
 
     # exp specific
-    SIM_MAX_DURATION = 8.0
-    HOVER_DURATION = 0.0
+    SIM_MAX_DURATION = 16.0#33.0
+    HOVER_DURATION = 5.0#22.0
     
     
     total_iterations = 0
@@ -61,12 +60,12 @@ def main(controller):
     curr_sim_time = 0.0
     curr_step = 0
 
-    target_velocity = 2.4
+    target_velocity = 1.2
     acceleration_time = 2.0
     hover_time = 0.0
     planner = Planner(velocity=target_velocity, acceleration_time=acceleration_time, dt=0.005, hover_time=hover_time, 
-                      start=(0.0,-2.5,-1.5), 
-                      end=(0.0,7.0,-1.5), 
+                      start=(0.0,-4.5,-1.75), 
+                      end=(0.0,7.0,-1.75), 
                       initial_yaw=yaw_uav_2, 
                       traj_type=0)
     planner.plot_trajectory_2d()
@@ -77,9 +76,10 @@ def main(controller):
 
     #predictor = AgileShallowPredictor()
     #predictor.load_state_dict(torch.load(find_file_with_substring("upbeat-elk30"), weights_only=True))
-    predictor = AgileShallowPredictor(output_dim=3)
+    predictor = AgilePredictor(output_dim=3)
 
-    predictor.load_state_dict(torch.load(find_file_with_substring("crunchy-muffler200"), weights_only=True))
+    predictor.load_state_dict(torch.load(find_file_with_substring("proper-hardball"), weights_only=True))
+    #predictor.load_state_dict(torch.load(find_file_with_substring("brave-photometry"), weights_only=True))
 
 
     ndp_predictor = DWPredictor()
@@ -116,7 +116,7 @@ def main(controller):
 
         if curr_sim_time < HOVER_DURATION:
             px4_input_1 = (0.0, 0.0, 0.0, 0.0, nan, nan, nan, nan, nan, nan, yaw_uav_1, nan)
-            px4_input_2 = (0.0, 0.0, -2.5, -1.5, nan, nan, nan, nan, nan, nan, yaw_uav_2, nan)
+            px4_input_2 = (0.0, 0.0, -2.5, -1.75, nan, nan, nan, nan, nan, nan, yaw_uav_2, nan)
             reply = controller.simulate(steps_per_call,  { uav_1.px4_idx: px4_input_1, uav_2.px4_idx: px4_input_2 })
             curr_sim_time += steps_per_call * time_step
             curr_step += steps_per_call
@@ -175,7 +175,8 @@ def main(controller):
             
 
             #feedforward = predictor.evaluate(np.array(uav_1.states[-1]).reshape(1,-1), np.array(uav_2.states[-1]).reshape(1,-1))[0]
-            ndp_feedforward = ndp_predictor.evaluate(np.array(uav_2.states[-1])[:6] - np.array(uav_1.states[-1])[:6])
+            ndp_feedforward = ndp_predictor.evaluate(np.array(uav_1.states[-1]).reshape(1,-1), 
+                                                     np.array(uav_2.states[-1]).reshape(1,-1))
             
             #feedforward *= 0.8
             #feedforward -= np.array([0.0,-5.0,0.0]) # add y error
@@ -184,9 +185,9 @@ def main(controller):
 
             
 
-
+        print("current waypoint:", current_waypoint)
         # check if current target already reached
-        if np.linalg.norm(np.array(pos2[:2]) - current_waypoint[:2])<0.35:
+        if np.linalg.norm(np.array(pos2[:2]) - current_waypoint[:2])<0.45:
             current_waypoint = planner.pop_waypoint(uav_2.states[-1][:9])
 
 
@@ -221,6 +222,8 @@ def main(controller):
     analyze_forces(uav_forces=uav_actual_forces, thrust_forces=uav_thrust_forces, 
                    predictor_forces_z=feedforward_forces_z, nfc_forces=nf_actual_forces,
                    dt=nfc2.dt)
+    
+    save_scenario_exp(dataset_name, uav_1.states, uav_2.states, np.array(planned_pos1),np.array(planned_pos2),time_seq)
 
 controller = None
 try:

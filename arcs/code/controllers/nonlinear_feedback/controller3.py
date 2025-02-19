@@ -10,7 +10,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class NonlinearFeedbackController3:
     """Sets UAV via attitude controller to fly with certain force in each x,y,z-axis"""
-    def __init__(self, uav_mass=3.035, target_yaw=0.0, dt=0.001):
+    def __init__(self, uav_mass=3.035, target_yaw=0.0, dt=0.005):
         self.dt = dt
         self.uav_mass = uav_mass
 
@@ -29,11 +29,17 @@ class NonlinearFeedbackController3:
         #self.M = np.eye(3) * self.uav_mass
         self.G = self.uav_mass * np.array([0, 0, self.g])
 
+        #self.k_p = np.array([4.0,4.0, 32.0]) #np.array([3.0,3.0, 18.0]) 
+        #self.k_v = np.array([1.0,1.0, 27.0]) #np.array([3.0,3.0, 15.0]) 
+
         self.k_p = np.array([4.0,4.0, 32.0]) #np.array([3.0,3.0, 18.0]) 
-        self.k_v = np.array([1.0,1.0, 27.0]) #np.array([3.0,3.0, 15.0]) 
+        self.k_v = np.array([1.0,1.0, 32.0]) #np.array([3.0,3.0, 15.0]) 
+
+        self.thrust_old = 0.0
+        
 
         
-        
+        self.k_d_thrust = 0.1#0.25 # motor delay constant
         
         self.pos = np.zeros(3)
         self.vel = np.zeros(3)
@@ -130,7 +136,13 @@ class NonlinearFeedbackController3:
         Nonlinear feedback output force, and converted to RPY-thrust for px4 attitude controller
         """
         roll, pitch, yaw, thrust = self.nonlinear_feedback(desired, feedforward)
-        print("thrust:", thrust)
+
+        self.thrust_dot = thrust - self.thrust_old
+
+        thrust += self.k_d_thrust*self.thrust_dot
+
+        self.thrust_old = thrust
+        #print("thrust:", thrust)
 
         roll, pitch, yaw = np.array([roll, pitch, yaw]) * 180.0/np.pi # convert to radians
 

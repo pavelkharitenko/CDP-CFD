@@ -43,16 +43,14 @@ class NeuralSwarmPredictor(nn.Module):
 
 
 
-    def evaluate(self, rel_state_vectors):
+    def evaluate(self, uav1_states, uav2_states):
         """
-        From R:6 (rel_pos, rel_vel) to R:3 (0, 0, dw_z) 
+        From R:6 (rel_pos, rel_vel) to R1 (dw_z) 
         """
+        rel_state_vectors = np.array(uav1_states)[:,:6] - np.array(uav2_states)[:,:6]
         with torch.no_grad():
             inputs = torch.tensor(rel_state_vectors).to(torch.float32)
-            dw_forces = self.forward(inputs).detach().cpu().numpy()
-            
-            padding = np.zeros((len(dw_forces), 3))
-            padding[:,2] = dw_forces.squeeze()
-            return padding
+            dw_forces = self.forward(inputs)
+            return dw_forces.detach().cpu().numpy().squeeze()
 
 

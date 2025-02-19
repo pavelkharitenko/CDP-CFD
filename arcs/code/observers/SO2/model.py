@@ -1,12 +1,15 @@
 #----------------------------------
 # DW predictor based on Smith et al. SO(2)-Equivariant Downwash Models for Close Proximity Flight
+# 
 #----------------------------------
-import torch
+import torch, sys
 import torch.nn as nn
 import numpy as np
 from skspatial.objects import Plane, Vector
 from skspatial.plotting import plot_3d
 import matplotlib.pyplot as plt
+sys.path.append('../../utils/')
+from utils import *
 
 class ShallowEquivariantPredictor(nn.Module):
     def __init__(self):
@@ -21,25 +24,27 @@ class ShallowEquivariantPredictor(nn.Module):
         return self.layers(x)
     
 
-    def evaluate(self, rel_state_vectors):
+    def evaluate(self, u1_states, u2_states):
         """
-        From R:6 (rel_pos, rel_vel) to R:3 (0, 0, dw_z) 
         """
 
-        hx_list = [h(rel_state[:3], rel_state[3:6], np.zeros((3,))) for rel_state in rel_state_vectors]
+        delta_p_list = u1_states[:,:3] - u2_states[:,:3] 
+        v_A_list = u1_states[:,3:6]
+        v_B_list = u2_states[:,3:6]
+
+        h_features = h_mapping(delta_p_list, v_B_list, v_A_list)
         with torch.no_grad():
 
-            h_inputs = torch.tensor(hx_list).to(torch.float32)
-            dp_tensor = torch.tensor(rel_state_vectors[:,:3])
+            h_inputs = torch.tensor(h_features).to(torch.float32)
+            dp_tensor = torch.tensor(delta_p_list).to(torch.float32)
 
             predicted = self.forward(h_inputs)
             dw_forces = F_tnsr(dp_tensor, predicted).detach().cpu().numpy()
             
-           
-            
             return dw_forces
 
 
+# helper methods
 
 def proj_A(vec):
     vector = Vector(vec)
@@ -89,29 +94,24 @@ def F(rel_state, f_result):
 
     return result
 
-def F_tnsr(rel_positions, f_results):
-    
+def F_tnsr(delta_position, f_results):
+    """
+    Maps relative uav states to dw force predictions, R^2 to R^3
+    """
 
-    rel_positions[:, 2] = 0 # project to x1-x2 plane
+    # compute polar angle of proj_xy(dp) w.r.t. x1-axis
+    angles = torch.atan2(delta_position[:, 1], delta_position[:, 0])  
+    angles = angles % (2 * torch.pi)  # Normalize to [0, 2π)
 
+    # extract force components
+    f1 = f_results[:, 0]  # magnitude in x1-x2 plane
+    f2 = f_results[:, 1]  # along x3-axis
 
-    #print(vectors, vectors.shape)
-
-
-    # Compute the polar angle with respect to the x1 (x) axis
-    # Polar angle θ = arccos(v_x / ||v||), where v_x is the x-component
-    angles = torch.atan2(rel_positions[:, 1], rel_positions[:, 0])  
-    angles = angles % (2 * torch.pi) # limit to range [0, 2π)
-
-    f1 = f_results[:, 0]
-    f2 = f_results[:, 1]
-
+    # project forces into 3D space
     x1 = torch.cos(angles) * f1
     x2 = torch.sin(angles) * f1
     x3 = f2
-    dw_forces = torch.stack((x1,x2,x3), dim=1)
+
+    dw_forces = torch.stack((x1, x2, x3), dim=1)
 
     return dw_forces
-
-
-

@@ -33,7 +33,6 @@ def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimize
     
   
     Y = Y_train.to(device)
-    rel_positions = X_train[:,6:].to(device)
     X_input = X_train[:,0:6].to(device)
 
     
@@ -43,6 +42,7 @@ def train_one_epoch_with_spectral_normalization(X_train,Y_train, model, optimize
     y_pred = model(X_input)
 
     # compute MSE loss of MSE(dw_pred, dw) = MSE(F(dp,f(hx), Y)
+    rel_positions = X_train[:,6:].to(device)
     dw_pred_list = F_tnsr(rel_positions, y_pred)
     #print("pred. Y first 2:", dw_pred_list[:2])
     

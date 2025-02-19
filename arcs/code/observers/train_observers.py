@@ -1,21 +1,35 @@
-import os, itertools, subprocess
+import subprocess, sys
+#from utils import *
+#sys.path.append('../utils/')
 
-# Define hyperparameter values to test
-learning_rates = [1e-3, 3e-4, 1e-4]
-epochs = [50, 100]
-batch_sizes = [32, 64]
 
-# Generate all combinations of hyperparameters
-hyperparam_combinations = list(itertools.product(learning_rates, epochs, batch_sizes))
+learning_rates = [1e-3, 2e-4, 5e-4]
+batch_sizes = [64]
+epochs_list = [300]
+seeds = [123]#, 456]
+SNs = [4,3,2]
 
-# Run training script for each combination
-for lr, n_epochs, batch_size in hyperparam_combinations:
-    print(f"Running training with lr={lr}, epochs={n_epochs}, batch_size={batch_size}")
+# Path to your training script
+train_script = "train.py"
 
-    # Run training script as a subprocess
-    subprocess.run([
-        "python", "train_shallow_batched.py",
-        "--lr", str(lr),
-        "--epochs", str(n_epochs),
-        "--batch_size", str(batch_size)
-    ])
+# Loop over all combinations of hyperparameters and seeds
+for lr in learning_rates:
+    for bs in batch_sizes:
+        for epochs in epochs_list:
+            for seed in seeds:
+                for sn in SNs:
+                    print(f"Running experiment with lr={lr}, batch_size={bs}, epochs={epochs}, seed={seed}, sn={sn}")
+                    
+                    # Construct the command to run the training script
+                    command = [
+                        "python", train_script,
+                        "--lr", str(lr),
+                        "--batch_size", str(bs),
+                        "--epochs", str(epochs),
+                        "--seed", str(seed),
+                        "--save_model", "True",
+                        "--sn_gamma", str(sn),
+                    ]
+                    
+                    # Run the command
+                    subprocess.run(command)

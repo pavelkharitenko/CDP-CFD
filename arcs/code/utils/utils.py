@@ -11,14 +11,15 @@ from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 from scipy.spatial.transform import Rotation as R
 
-# Set global font size
+
+# global font sizes for IEEE paper
 plt.rcParams.update({
-    "font.size": 10,  # Default font size for text
-    "axes.titlesize": 10,  # Title font size
-    "axes.labelsize": 10,  # Axis label font size
-    "xtick.labelsize": 8,  # X-axis tick label font size
-    "ytick.labelsize": 8,  # Y-axis tick label font size
-    "legend.fontsize": 8,  # Legend font size
+        'font.size': 7,          # General font size
+        'axes.titlesize': 7,     # Subplot title font size
+        'axes.labelsize': 7,     # Axis label font size
+        'xtick.labelsize': 7,    # X-axis tick label font size
+        'ytick.labelsize': 7,    # Y-axis tick label font size
+        'legend.fontsize': 7,    # Legend font size
 })
 
 
@@ -1403,6 +1404,181 @@ def create_demo_subfigure_1(path1, path2):
     plot_multiple_segments(time1, u2_z_dw_forces1, time2, u2_z_dw_forces2, overlaps1=overlaps1, overlaps2=overlaps2)
 
 
+def save_scenario_exp(dataset_name, uav_1_states, uav_2_states, planned_pos1,planned_pos2,time_seq):
+    np.savez(f"{dataset_name}_200Hz_80_005_len{len(uav_1_states)}ts", 
+                 uav_1_states=uav_1_states, 
+                 uav_2_states=uav_2_states, 
+                 uav_1_planned_pos=planned_pos1,
+                 uav_2_planned_pos=planned_pos2,
+                 time=time_seq)
+
+def create_scenario_exp_figure(dataset_path, start_seconds=0, end_seconds=0):
+    """
+    Create a time plot of the z-position of UAV 1 and UAV 2, with vertical lines indicating the first and last overlap.
+    Also plot the target z-points from planned_pos1 and planned_pos2.
+
+    Parameters:
+        dataset_path (str): Path to the dataset file.
+        start_seconds (int): Number of seconds to remove from the start of the data.
+        end_seconds (int): Number of seconds to remove from the end of the data.
+    """
+    # Load overlap, dw forces, and UAV's trajectories
+    data = np.load(dataset_path)
+    uav_1_states, uav_2_states, planned_pos1, planned_pos2, time_seq = data['uav_1_states'], data['uav_2_states'], data['uav_1_planned_pos'], data['uav_2_planned_pos'], data['time']
+    u2_z_dw_forces, overlap_indices, overlaps = extract_data(uav_1_states, uav_2_states, time_seq)
+
+    uav1_pos = uav_1_states[:, :3]
+    uav2_pos = uav_2_states[:, :3]
+
+    # Extract z-positions
+    uav1_z = uav1_pos[:, 2]
+    uav2_z = uav2_pos[:, 2]
+
+    # Extract target z-points from planned_pos1 and planned_pos2
+    target_uav1_z = planned_pos1[:, 2]
+    target_uav2_z = planned_pos2[:, 2]
+
+    # Remove the first `start_seconds` and last `end_seconds` from the data
+    if start_seconds > 0:
+        start_index = np.where(time_seq >= start_seconds)[0][0]  # Find the index corresponding to `start_seconds`
+    else:
+        start_index = 0
+
+    if end_seconds > 0:
+        end_index = np.where(time_seq <= time_seq[-1] - end_seconds)[0][-1]  # Find the index corresponding to `end_seconds` before the end
+    else:
+        end_index = len(time_seq)
+
+    # Slice the data
+    time_seq = time_seq[start_index:end_index]
+    uav1_z = uav1_z[start_index:end_index]
+    uav2_z = uav2_z[start_index:end_index]
+    target_uav1_z = target_uav1_z[start_index:end_index]
+    target_uav2_z = target_uav2_z[start_index:end_index]
+    overlap_indices = overlap_indices[(overlap_indices >= start_index) & (overlap_indices < end_index)] - start_index
+
+    # Plot the z-positions over time
+    plt.figure(figsize=(10, 6))
+    plt.plot(time_seq, uav1_z, label='UAV 1 Z-Position')
+    plt.plot(time_seq, uav2_z, label='UAV 2 Z-Position')
+    plt.plot(time_seq, target_uav1_z, '--', label='Target UAV 1 Z-Position')
+    plt.plot(time_seq, target_uav2_z, '--', label='Target UAV 2 Z-Position')
+
+    # Identify the first and last overlap indices
+    if len(overlap_indices) > 0:
+        first_overlap_index = overlap_indices[0]
+        last_overlap_index = overlap_indices[-1]
+
+        # Plot vertical lines at the first and last overlap times
+        plt.axvline(x=time_seq[first_overlap_index], color='r', linestyle='--', label='First Overlap')
+        plt.axvline(x=time_seq[last_overlap_index], color='g', linestyle='--', label='Last Overlap')
+    else:
+        print("No overlaps found in the trimmed data.")
+
+    # Add labels, title, and legend
+    plt.xlabel('Time (s)')
+    plt.ylabel('Z-Position')
+    plt.title('Z-Position of UAV 1 and UAV 2 over Time')
+    plt.legend()
+    plt.grid(True)
+
+    # Show the plot
+    plt.show()
+
+def create_multiple_scenarios_figure(dataset_paths, start_seconds_list, end_seconds_list):
+    """
+    Create a figure with subplots for multiple scenarios, optimized for a 1-column IEEE paper layout.
+
+    Parameters:
+        dataset_paths (list of str): List of paths to the dataset files.
+        start_seconds_list (list of int): List of start seconds to trim for each dataset.
+        end_seconds_list (list of int): List of end seconds to trim for each dataset.
+    """
+    # Validate input lengths
+    if len(dataset_paths) != len(start_seconds_list) or len(dataset_paths) != len(end_seconds_list):
+        raise ValueError("The lengths of dataset_paths, start_seconds_list, and end_seconds_list must match.")
+
+    # note: figure size for 1-column IEEE paper (width: 3.5 inches, height: adjusted for subplots)
+    fig_width = 3.5  # inches
+    fig_height = 1.5 * len(dataset_paths)  # Adjust height based on number of subplots
+    fig, axes = plt.subplots(len(dataset_paths), 1, figsize=(fig_width, fig_height), squeeze=False)
+
+
+
+    for i, (dataset_path, start_seconds, end_seconds) in enumerate(zip(dataset_paths, start_seconds_list, end_seconds_list)):
+        # Load overlap, dw forces, and UAV's trajectories
+        data = np.load(dataset_path)
+        uav_1_states, uav_2_states, planned_pos1, planned_pos2, time_seq = data['uav_1_states'], data['uav_2_states'], data['uav_1_planned_pos'], data['uav_2_planned_pos'], data['time']
+        u2_z_dw_forces, overlap_indices, overlaps = extract_data(uav_1_states, uav_2_states, time_seq)
+
+        uav1_pos = uav_1_states[:, :3]
+        uav2_pos = uav_2_states[:, :3]
+
+        # Extract z-positions
+        uav1_z = uav1_pos[:, 2]
+        uav2_z = uav2_pos[:, 2]
+
+        # Extract target z-points from planned_pos1 and planned_pos2
+        target_uav1_z = planned_pos1[:, 2]
+        target_uav2_z = planned_pos2[:, 2]
+
+        # Remove the first `start_seconds` and last `end_seconds` from the data
+        if start_seconds > 0:
+            start_index = np.where(time_seq >= start_seconds)[0][0]  # Find the index corresponding to `start_seconds`
+        else:
+            start_index = 0
+
+        if end_seconds > 0:
+            end_index = np.where(time_seq <= time_seq[-1] - end_seconds)[0][-1]  # Find the index corresponding to `end_seconds` before the end
+        else:
+            end_index = len(time_seq)
+
+        # Slice the data
+        time_seq = time_seq[start_index:end_index]
+        uav1_z = uav1_z[start_index:end_index]
+        uav2_z = uav2_z[start_index:end_index]
+        target_uav1_z = target_uav1_z[start_index:end_index]
+        target_uav2_z = target_uav2_z[start_index:end_index]
+        overlap_indices = overlap_indices[(overlap_indices >= start_index) & (overlap_indices < end_index)] - start_index
+
+        # Plot the z-positions over time in the current subplot
+        ax = axes[i, 0]
+        ax.plot(time_seq, uav1_z, label='UAV 1', linewidth=2)
+        ax.plot(time_seq, uav2_z, label='UAV 2', linewidth=2)
+        ax.plot(time_seq, target_uav1_z, '--', label='Target UAV 1', linewidth=1)
+        ax.plot(time_seq, target_uav2_z, '--', label='Target UAV 2', linewidth=1)
+
+        # Identify the first and last overlap indices
+        if len(overlap_indices) > 0:
+            first_overlap_index = overlap_indices[0]
+            last_overlap_index = overlap_indices[-1]
+
+            # Plot vertical lines at the first and last overlap times
+            ax.axvline(x=time_seq[first_overlap_index], color='black', linestyle='--', linewidth=1)
+            ax.axvline(x=time_seq[last_overlap_index], color='black', linestyle='--', linewidth=1)
+        else:
+            print(f"No overlaps found in the trimmed data for scenario {i + 1}.")
+
+        # Add labels, title, and legend for the subplot
+        if i == len(dataset_paths)-1:
+            ax.set_xlabel('Time [s]')
+            #ax.legend(loc='upper right', bbox_to_anchor=(1, 1))  # Compact legend
+        ax.set_ylabel('Z-Position [m]')
+        #ax.set_title(f'Scenario {i + 1} (Trimmed: {start_seconds}s to {end_seconds}s)')
+        ax.grid(True, linestyle='--', linewidth=0.5)  # Light grid lines
+
+    # Adjust layout and save the plot
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to accommodate the suptitle
+    plt.savefig('uav_z_positions_ieee.pdf', format='pdf', bbox_inches='tight')  # Save as PDF for Overleaf
+    plt.show()
+
+
+    
+
+
+
+
+
 
 
 def extract_data(uav_1_states, uav_2_states, time_seq):
@@ -1590,6 +1766,7 @@ def plot_array_with_segments(fig, time, array, roll=True, color=None, label=None
     if not roll:
         
         #fig.plot(time, array, label=label, color=color)
+
         fig.plot(array, label=label, color=color)
 
         
@@ -1808,6 +1985,33 @@ def find_file_with_substring(substring):
             if substring in filename:
                 return os.path.abspath(os.path.join(dirpath, filename))
     return None
+
+
+def find_files_in_folder_with_substring(folder_substring, file_extension):
+    """
+    Search for folders containing the given substring in their name within the current directory and subdirectories.
+    Then, return all files with the specified file extension inside those folders.
+    
+    Args:
+        folder_substring (str): The substring to look for in the folder names.
+        file_extension (str): The file extension to look for (e.g., '.txt', '.csv').
+    
+    Returns:
+        list: A list of full paths to the files with the specified extension inside the matching folders.
+    """
+    root_dir = "../../../../"  # Set the root directory to the current working directory
+    matching_files = []
+
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        # Check if the folder name contains the substring
+        if folder_substring in os.path.basename(dirpath):
+            # Iterate through all files in the folder
+            for filename in filenames:
+                if filename.endswith(file_extension):
+                    # Add the full path of the file to the list
+                    matching_files.append(os.path.abspath(os.path.join(dirpath, filename)))
+
+    return matching_files
 
 
 def compute_metrics(y_true, y_pred, nrmse_normalization="mean"):
@@ -2536,7 +2740,7 @@ def equivariant_agile_transform(u1_states, u2_states, inference=False):
     # |[v1]xy|, [v1]z, 
     # |[v2]xy|, [v2]z, angle_xy(v1,v2)
     # [f]xy, [f]z, angle_xy(f, dp)
-    return np.column_stack(result), None #flipped_idx
+    return np.column_stack(result), None#flipped_idx
 
 
 def continous_transform(equivariant_states):
@@ -2741,7 +2945,7 @@ class NormalizedMSELoss(torch.nn.Module):
         return torch.mean(normalized_error ** 2)  
 
 class WeightedMSELoss(torch.nn.Module):
-    def __init__(self, weight_x=5.0, weight_y=5.0, weight_z=1.0):
+    def __init__(self, weight_x=10.0, weight_y=1.0, weight_z=1.0):
         super(WeightedMSELoss, self).__init__()
         self.weight_x = weight_x
         self.weight_y = weight_y
@@ -2760,4 +2964,279 @@ class WeightedMSELoss(torch.nn.Module):
         weighted_mse = self.weight_x * mse_x + self.weight_y * mse_y + self.weight_z * mse_z
 
         return weighted_mse
+
+
+
+
+# evaluation
+
+def print_eval_table(time, truth, predictions, visualize, overlaps, dataset_titles):
     
+    all_results = []
+    for idx, pred_dw in enumerate(predictions):
+    
+
+    
+        #fig = plt.subplot()
+        if visualize:
+            plt.figure(figsize=(10, 6))
+            fig = plt.subplot()
+            #fig.plot(u2_z_forces, label="UAV's z-axis forces") # unsmoothed
+            plot_array_with_segments(fig, np.array(time[idx]), truth[idx], color="magenta", roll=False, 
+                                     label="downwash disturbance forces", overlaps=overlaps)
+            plot_array_with_segments(fig, np.array(time[idx]), pred_dw, roll=False)
+            plt.ylabel("Force [N]")
+            plt.xlabel("time [s]")
+            plt.grid()
+            plt.title("Actual bottom UAV Z-forces, controller's thrust, and residual downwash force")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+        #plot_array_with_segments(fig, np.array(time_seq)[overlaps], prediction[:,1][overlaps], roll=roll_iterations, color=colors[idx], label=labels[idx])
+
+        #compute_rmse(prediction[:,2][overlaps], u2_z_dw_forces[overlaps],label=labels[idx])
+
+        # Compute metrics
+        #metrics = compute_metrics(u2_z_dw_forces[overlaps], prediction[:, 2][overlaps]) # in overlap regions only
+
+        #print(truth[idx].shape, pred_dw.shape)
+        metrics = compute_metrics(truth[idx], pred_dw) # everywhere
+
+        #metrics = compute_metrics(u2_y_dw_forces[overlaps], prediction[:, 1][overlaps])
+
+        metrics["Label"] = dataset_titles[idx]
+        all_results.append(metrics)
+
+    
+
+
+
+    # Compute average metrics
+    average_metrics = {
+        "Label": "Average",
+        "RMSE": np.mean([res["RMSE"] for res in all_results]),
+        "NRMSE (mean)": np.mean([res["NRMSE (mean)"] for res in all_results]),
+        "MAE": np.mean([res["MAE"] for res in all_results]),
+        "R2 Score": np.mean([res["R2 Score"] for res in all_results])
+    }
+    
+    
+    headers = ["Dataset", "RMSE", "NRMSE (mean)", "MAE", "R2 Score"]
+    all_results.append(average_metrics)
+
+    table = [[res["Label"], res["RMSE"], res["NRMSE (mean)"], res["MAE"], res["R2 Score"]] for res in all_results]
+    print(tabulate(table, headers=headers, tablefmt="grid"))
+
+
+def evaluate_model(model, eval_xyz=True, visualize=False):
+    model.to("cpu")
+    model.eval()
+    print("begin evaluating model on validation:")
+    dataset_titles = [
+    "1 fly below",
+    "2 fly above",
+    "3 swapping",
+    "3 swapping (very fast)",
+    "all 4 in total"
+    ]
+
+    dataset_paths = [
+        find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz"),
+        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz"),
+        find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz"),
+        find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len20802ts_67_iterations_testset.npz"),
+    ]
+
+    predictions_x = []
+    predictions_y = []
+    predictions_z = []
+
+    truths_x = []
+    truths_y = []
+    truths_z = []
+
+    time = []
+
+    dataset_lenghts = []
+    
+    for idx, path_idx in enumerate([[0],[1],[2],[3]]):
+
+        # load states to validate on
+        uav_1_states = []
+        uav_2_states = []
+        time_seq = []
+
+        for path in np.array(dataset_paths)[path_idx]:
+            
+            data = np.load(path)
+            uav_1_state, uav_2_state = data['uav_1_states'][:-1], data['uav_2_states'][:-1]
+
+            uav_1_states.extend(uav_1_state)
+            uav_2_states.extend(uav_2_state)
+            time_seq.extend(np.arange(0,len(uav_1_state)))
+
+        #print("dataset length", len(uav_1_states))
+
+        dataset_lenghts.append(len(uav_1_states))
+
+        rel_state_vector_list = np.array(uav_1_states) - np.array(uav_2_states)
+        _, overlap_indices, overlaps = extract_data(uav_1_states, uav_2_states, time_seq)
+        u2_x_dw_forces, u2_y_dw_forces, u2_z_dw_forces = extract_dw_forces(uav_2_states)
+
+        prediction = model.evaluate(np.array(uav_1_states), np.array(uav_2_states))
+
+        #print(prediction[:4])
+
+        if eval_xyz:
+            predictions_x.append(prediction[:,0])
+            predictions_y.append(prediction[:,1])
+            predictions_z.append(prediction[:,2])
+            truths_x.append(u2_x_dw_forces)
+            truths_y.append(u2_y_dw_forces)
+            truths_z.append(u2_z_dw_forces)
+
+        
+        else:
+            predictions_z.append(prediction)
+            truths_z.append(u2_z_dw_forces)
+
+        time.append(time_seq)
+
+    print("Z-Axis Dw Prediction Evaluation:")
+    print_eval_table(time,truths_z,predictions_z, visualize, overlaps, dataset_titles)
+
+    if eval_xyz:
+        print("X-Axis Dw Prediction Evaluation:")
+        print_eval_table(time,truths_x,predictions_y, visualize, overlaps, dataset_titles)
+        print("Y-Axis Dw Prediction Evaluation:")
+        print_eval_table(time,truths_y,predictions_y, visualize, overlaps, dataset_titles)
+
+
+def evaluate_analytical(model, eval_xyz=True, visualize=False):
+    print("begin evaluating analytical model on validation:")
+    dataset_titles = [
+    "1 fly below",
+    "2 fly above",
+    "3 swapping",
+    "3 swapping (very fast)",
+    "all 4 in total"
+    ]
+
+    dataset_paths = [
+        find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz"),
+        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz"),
+        find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz"),
+        find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len20802ts_67_iterations_testset.npz"),
+    ]
+
+    predictions_x = []
+    predictions_y = []
+    predictions_z = []
+
+    truths_x = []
+    truths_y = []
+    truths_z = []
+
+    time = []
+
+    dataset_lenghts = []
+    
+    for idx, path_idx in enumerate([[0],[1],[2],[3]]):
+
+        # load states to validate on
+        uav_1_states = []
+        uav_2_states = []
+        time_seq = []
+
+        for path in np.array(dataset_paths)[path_idx]:
+            
+            data = np.load(path)
+            uav_1_state, uav_2_state = data['uav_1_states'][:-1], data['uav_2_states'][:-1]
+
+            uav_1_states.extend(uav_1_state)
+            uav_2_states.extend(uav_2_state)
+            time_seq.extend(np.arange(0,len(uav_1_state)))
+
+        #print("dataset length", len(uav_1_states))
+
+        dataset_lenghts.append(len(uav_1_states))
+
+        rel_state_vector_list = np.array(uav_1_states) - np.array(uav_2_states)
+        _, overlap_indices, overlaps = extract_data(uav_1_states, uav_2_states, time_seq)
+        u2_x_dw_forces, u2_y_dw_forces, u2_z_dw_forces = extract_dw_forces(uav_2_states)
+
+        prediction = model.evaluate(np.array(uav_1_states), np.array(uav_2_states))
+
+        #print(prediction[:4])
+
+        if eval_xyz:
+            predictions_x.append(prediction[:,0])
+            predictions_y.append(prediction[:,1])
+            predictions_z.append(prediction[:,2])
+            truths_x.append(u2_x_dw_forces)
+            truths_y.append(u2_y_dw_forces)
+            truths_z.append(u2_z_dw_forces)
+
+        
+        else:
+            predictions_z.append(prediction)
+            truths_z.append(u2_z_dw_forces)
+
+        time.append(time_seq)
+
+    print("Z-Axis Dw Prediction Evaluation:")
+    print_eval_table(time,truths_z,predictions_z, visualize, overlaps, dataset_titles)
+
+    if eval_xyz:
+        print("X-Axis Dw Prediction Evaluation:")
+        #print_eval_table(time,truths_x,predictions_y, visualize, overlaps, dataset_titles)
+        print("Y-Axis Dw Prediction Evaluation:")
+        #print_eval_table(time,truths_y,predictions_y, visualize, overlaps, dataset_titles)
+    
+# methods for SO(2)-Equivariant predictor:
+def proj_XY(vectors):
+    # projects vector on e_1, e_2 plane (XY)
+    return np.array([vectors[..., 0], vectors[..., 1], np.zeros_like(vectors[..., 0])]).T
+
+def h_mapping(delta_p_list, v_B_list, v_A_list):
+    # compute feature mapping R^9 to R^6, in a vecorized fashion, without assumption 2
+    delta_p = np.array(delta_p_list)
+    v_B = np.array(v_B_list)
+    v_A = np.array(v_A_list)
+
+    # Project Δp, v^B, and v^A onto the xy-plane
+    proj_delta_p = proj_XY(delta_p)
+    proj_v_B = proj_XY(v_B)
+    proj_v_A = proj_XY(v_A)
+
+    # norms of dp and vB vectors
+    norm_proj_delta_p = np.linalg.norm(proj_delta_p, axis=1, keepdims=True)
+    norm_proj_v_B = np.linalg.norm(proj_v_B, axis=1, keepdims=True)
+
+    
+    epsilon = 1e-10 # for numeric stability
+    norm_proj_delta_p = np.where(norm_proj_delta_p < epsilon, epsilon, norm_proj_delta_p)
+    norm_proj_v_B = np.where(norm_proj_v_B < epsilon, epsilon, norm_proj_v_B)
+ 
+    feature1 = np.sum(proj_delta_p * proj_v_B, axis=1, keepdims=True) / (norm_proj_delta_p * norm_proj_v_B)
+    feature2 = norm_proj_delta_p
+    feature3 = norm_proj_v_B
+    feature4 = delta_p[:, 2, np.newaxis]  # [R^A_A Δp]_3: z-component of Δp
+    feature5 = v_B[:, 2, np.newaxis]      # [R^A_A v^B]_3: z-component of v^B
+    feature6 = np.linalg.norm(proj_v_A, axis=1, keepdims=True)
+
+    # Combine the features into the output matrix
+    h_x = np.hstack((feature1, feature2, feature3, feature4, feature5, feature6))
+
+    return h_x
+
+
+
+def apply_spectral_norm(model, sn_gamma):
+    with torch.no_grad():
+        for name, param in model.named_parameters():
+            if 'weight' in name and param.ndimension() > 1:  # only applied to weight matrices
+                weights = param.data
+                spec_norm = torch.linalg.norm(weights, 2)
+                if spec_norm > sn_gamma:
+                    param.data = (weights / spec_norm) * sn_gamma

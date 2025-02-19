@@ -6,7 +6,7 @@ from model import *
 
 class SO2Dataset(torch.utils.data.Dataset):
     def __init__(self, experiment_path):
-        self.exp_path = experiment_path
+        self.exp_paths = experiment_path
         self.extract_so2_labels()
         
 
@@ -23,26 +23,41 @@ class SO2Dataset(torch.utils.data.Dataset):
         Extract relative position (uav1 - uav2), uav2 vel, uav1 vel, and dw forces
         """
         self.N = 0
-        x, y = [], []
-        
-
-        data = np.load(self.exp_path)
-        uav_1_states, uav_2_states = data['uav_1_states'], data['uav_2_states']
-        
-        dx = uav_1_states[:,:3] - uav_2_states[:,:3]
-
-        relpos_vel_b_vel_a = list(zip(dx, uav_2_states[:,3:6], uav_1_states[:,3:6]))
-        x = [ h(dp_vb_va[0], dp_vb_va[1], dp_vb_va[2]) + [dp_vb_va[0][0], dp_vb_va[0][1], dp_vb_va[0][2]] for dp_vb_va in relpos_vel_b_vel_a]
-        y = data['dw_forces']
+        x = np.empty((0,9))
+        y = np.empty((0,3))
+        for exp_path in self.exp_paths:
+            self.N = 0
             
+            data = np.load(exp_path)
+            uav_1_states, uav_2_states = data['uav_1_states'], data['uav_2_states']
+            
+            delta_p_list = uav_1_states[:,:3] - uav_2_states[:,:3] 
+            v_A_list = uav_1_states[:,3:6]
+            v_B_list = uav_2_states[:,3:6]
 
-        print("extracted total data of lenghts:", len(x))
-        print("extracted total data of lenghts:", len(y))
+            # compute network input via feature mapping function h
+            h_features = h_mapping(delta_p_list, v_B_list, v_A_list)
+            # include dp for F (to recover absolute angle of downwash)
+            x_i = np.column_stack((h_features, delta_p_list))
+
+            dw_x,dw_y,dw_z = extract_dw_forces(uav_2_states)
+            y_i = np.column_stack((dw_x, dw_y, dw_z))
+
+            x = np.vstack((x, x_i))
+            y = np.vstack((y,y_i))
+
+
+        print("extracted and mapped total X data with length:", len(x))
+        print("extracted total Y labels with length:", len(y))
+
+            
+            
     
-        self.x =  torch.tensor(np.array(x)).to(torch.float32)
-        self.y =  torch.tensor(np.array(y)).to(torch.float32)
+        self.x =  torch.tensor(x).to(torch.float32)
+        self.y =  torch.tensor(y).to(torch.float32)
 
         self.N = len(self.x)
+
 
 
 
