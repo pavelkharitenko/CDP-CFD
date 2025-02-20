@@ -1903,9 +1903,9 @@ def plot_multiple_segments(time1, array1, time2, array2, overlaps1=[], overlaps2
     fig.text(0.02, 0.5, 'Forces [N]', va='center', rotation='vertical')
     #handles, labels = axes[0].get_legend_handles_labels()
     #fig.legend(handles, labels, loc='upper right')  # Single legend for both subplots
-    #plt.show()
-    plt.savefig("single_column_figure.pdf", format="pdf", bbox_inches="tight")
-    plt.close()
+    plt.show()
+    #plt.savefig("single_column_figure.pdf", format="pdf", bbox_inches="tight")
+    #plt.close()
 
 def compute_rmse(array1, array2, label=None):
     rmse = np.sqrt(np.mean((array1 - array2) ** 2))
