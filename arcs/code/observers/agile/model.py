@@ -6,10 +6,10 @@ from utils import *
 
 # input format: x = [pos_rel, vel_rel] (relative state vector)
 # output format: y = f_dw_pred xyz-force of downwash
+        
 
-    
 class AgileShallowPredictor(nn.Module):
-    def __init__(self, input_dim=14, hidden_dim=64, output_dim=1):
+    def __init__(self, input_dim=14, hidden_dim=128, output_dim=1):
         """
         for geometric equivariance input is
         |proj_xy(T1)|, |proj_xy(T2)|, proj_z(T1), proj_z(T2), angle(proj_xy(T1),proj_xy(T2)), 
@@ -55,7 +55,6 @@ class AgileShallowPredictor(nn.Module):
 
             # flip y axis of disturbance if true disturbance has been on left before equiv. transform
             #dw_xy[flipped_idx,1] *= -1.0
-
             dw_z = dw_forces[:,2]
 
 

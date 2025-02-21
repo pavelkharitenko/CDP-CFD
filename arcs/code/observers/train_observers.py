@@ -6,11 +6,13 @@ import subprocess, sys
 learning_rates = [1e-3, 2e-4, 5e-4]
 batch_sizes = [64]
 epochs_list = [300]
-seeds = [123]#, 456]
-SNs = [4,3,2]
+#seeds = [123, 456]
+seeds = [789, 101112, 131415]
+
+SNs = [None]
 
 # Path to your training script
-train_script = "train.py"
+train_script = "train_batched.py"
 
 # Loop over all combinations of hyperparameters and seeds
 for lr in learning_rates:
@@ -28,7 +30,7 @@ for lr in learning_rates:
                         "--epochs", str(epochs),
                         "--seed", str(seed),
                         "--save_model", "True",
-                        "--sn_gamma", str(sn),
+                        #"--sn_gamma", str(sn),
                     ]
                     
                     # Run the command
