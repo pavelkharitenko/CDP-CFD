@@ -10,6 +10,7 @@ from tabulate import tabulate
 from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 from scipy.spatial.transform import Rotation as R
+from collections import defaultdict
 
 
 # global font sizes for IEEE paper
@@ -1396,13 +1397,6 @@ def create_demo_figure_1(dataset_path):
     
 
 
-def create_demo_subfigure_1(path1, path2):
-
-    u2_z_dw_forces1, overlap_indices1, overlaps1, time1 = load_scenario_data(path1)
-    u2_z_dw_forces2, overlap_indices2, overlaps2, time2 = load_scenario_data(path2)
-
-    plot_multiple_segments(time1, u2_z_dw_forces1, time2, u2_z_dw_forces2, overlaps1=overlaps1, overlaps2=overlaps2)
-
 
 def save_scenario_exp(dataset_name, uav_1_states, uav_2_states, planned_pos1,planned_pos2,time_seq):
     np.savez(f"{dataset_name}_200Hz_80_005_len{len(uav_1_states)}ts", 
@@ -1572,13 +1566,234 @@ def create_multiple_scenarios_figure(dataset_paths, start_seconds_list, end_seco
     plt.savefig('uav_z_positions_ieee.pdf', format='pdf', bbox_inches='tight')  # Save as PDF for Overleaf
     plt.show()
 
+import numpy as np
+import matplotlib.pyplot as plt
 
+def calculate_error_statistics(baseline_error, predictor_error, sn_predictor_error, overlap_mask):
+    """
+    Calculate and print various statistics regarding the errors for baseline, Predictor, and SN Predictor.
     
+    Parameters:
+    - baseline_error: numpy array, error values for the baseline.
+    - predictor_error: numpy array, error values for the Predictor.
+    - sn_predictor_error: numpy array, error values for the SN Predictor.
+    - overlap_mask: numpy array, boolean mask indicating the overlap region.
+    """
+    
+    def print_statistics(errors, region_name):
+        max_error = np.max(errors)
+        avg_error = np.mean(errors)
+        min_error = np.min(errors)
+        print(f"{region_name} Region:")
+        print(f"  Max Error: {max_error:.4f}")
+        print(f"  Average Error: {avg_error:.4f}")
+        print(f"  Min Error: {min_error:.4f}")
+        return max_error, avg_error, min_error
+    
+    # Total region statistics
+    print("\nTotal Region Statistics:")
+    baseline_max, baseline_avg, baseline_min = print_statistics(baseline_error, "Baseline")
+    predictor_max, predictor_avg, predictor_min = print_statistics(predictor_error, "Predictor")
+    sn_predictor_max, sn_predictor_avg, sn_predictor_min = print_statistics(sn_predictor_error, "SN Predictor")
+    
+    # Overlap region statistics
+    print("\nOverlap Region Statistics:")
+    baseline_overlap_max, baseline_overlap_avg, baseline_overlap_min = print_statistics(baseline_error[overlap_mask], "Baseline")
+    predictor_overlap_max, predictor_overlap_avg, predictor_overlap_min = print_statistics(predictor_error[overlap_mask], "Predictor")
+    sn_predictor_overlap_max, sn_predictor_overlap_avg, sn_predictor_overlap_min = print_statistics(sn_predictor_error[overlap_mask], "SN Predictor")
+    
+    # Comparison of errors
+    def print_comparison(base_error, comp_error, name):
+        max_diff = comp_error[0] - base_error[0]
+        avg_diff = comp_error[1] - base_error[1]
+        min_diff = comp_error[2] - base_error[2]
+        max_diff_percent = (max_diff / base_error[0]) * 100
+        avg_diff_percent = (avg_diff / base_error[1]) * 100
+        min_diff_percent = (min_diff / base_error[2]) * 100
+        print(f"\nComparison of {name} with Baseline:")
+        print(f"  Max Error Difference: {max_diff:.4f} ({max_diff_percent:.2f}%)")
+        print(f"  Average Error Difference: {avg_diff:.4f} ({avg_diff_percent:.2f}%)")
+        print(f"  Min Error Difference: {min_diff:.4f} ({min_diff_percent:.2f}%)")
+    
+    # Total region comparison
+    print("\nTotal Region Comparison:")
+    print_comparison((baseline_max, baseline_avg, baseline_min), (predictor_max, predictor_avg, predictor_min), "Predictor")
+    print_comparison((baseline_max, baseline_avg, baseline_min), (sn_predictor_max, sn_predictor_avg, sn_predictor_min), "SN Predictor")
+    
+    # Overlap region comparison
+    print("\nOverlap Region Comparison:")
+    print_comparison((baseline_overlap_max, baseline_overlap_avg, baseline_overlap_min), (predictor_overlap_max, predictor_overlap_avg, predictor_overlap_min), "Predictor")
+    print_comparison((baseline_overlap_max, baseline_overlap_avg, baseline_overlap_min), (sn_predictor_overlap_max, sn_predictor_overlap_avg, sn_predictor_overlap_min), "SN Predictor")
+
+def create_final_exp_figure(dataset_paths, start_seconds_list, end_seconds_list):
+    """
+    Create a single plot with:
+    - All UAV 2 trials (individual curves in green, orange, purple).
+    - Average UAV 1 z-position (single curve).
+    - Global min and max overlap times (vertical lines).
+    - Overlap regions (shaded areas).
+    - Target line for UAV 2 at -0.75 (red, limited to UAV 2 range).
+    - Two histograms: overall errors (upper) and overlap errors (lower).
+
+    Parameters:
+        dataset_paths (list of str): List of paths to the dataset files.
+        start_seconds_list (list of int): List of start seconds to trim for each dataset.
+        end_seconds_list (list of int): List of end seconds to trim for each dataset.
+    """
+    # Validate input lengths
+    if len(dataset_paths) != len(start_seconds_list) or len(dataset_paths) != len(end_seconds_list):
+        raise ValueError("The lengths of dataset_paths, start_seconds_list, and end_seconds_list must match.")
+
+    # Figure size for 1-column IEEE paper (width: 7 inches, height: adjusted)
+    fig_width = 7.0  # inches (wider to accommodate both plots)
+    fig_height = 2.25  # Adjusted height for split histograms
+    fig = plt.figure(figsize=(fig_width, fig_height))
+
+    # Create subplots: main plot (left), upper histogram (right top), lower histogram (right bottom)
+    gs = fig.add_gridspec(2, 2, width_ratios=[2, 1], height_ratios=[1, 1])
+    ax1 = fig.add_subplot(gs[:, 0])  # Main plot (left, spans both rows)
+    ax2 = fig.add_subplot(gs[0, 1])  # Upper histogram (right top)
+    ax3 = fig.add_subplot(gs[1, 1])  # Lower histogram (right bottom)
+
+    # Initialize lists to store trimmed data
+    all_time_seqs = []
+    all_uav1_z = []
+    all_uav2_z = []
+    all_overlap_indices = []
+
+    # Loop through each dataset
+    for i, (dataset_path, start_seconds, end_seconds) in enumerate(zip(dataset_paths, start_seconds_list, end_seconds_list)):
+        # Load overlap, dw forces, and UAV's trajectories
+        data = np.load(dataset_path)
+        uav_1_states, uav_2_states, planned_pos1, planned_pos2, time_seq = data['uav_1_states'], data['uav_2_states'], data['uav_1_planned_pos'], data['uav_2_planned_pos'], data['time']
+        u2_z_dw_forces, overlap_indices, overlaps = extract_data(uav_1_states, uav_2_states, time_seq)
+
+        uav1_pos = uav_1_states[:, :3]
+        uav2_pos = uav_2_states[:, :3]
+
+        # Extract z-positions
+        uav1_z = uav1_pos[:, 2]
+        uav2_z = uav2_pos[:, 2]
+
+        # Remove the first `start_seconds` and last `end_seconds` from the data
+        if start_seconds > 0:
+            start_index = np.where(time_seq >= start_seconds)[0][0]  # Find the index corresponding to `start_seconds`
+        else:
+            start_index = 0
+
+        if end_seconds > 0:
+            end_index = np.where(time_seq <= time_seq[-1] - end_seconds)[0][-1]  # Find the index corresponding to `end_seconds` before the end
+        else:
+            end_index = len(time_seq)
+
+        # Slice the data
+        time_seq = time_seq[start_index:end_index]
+        uav1_z = uav1_z[start_index:end_index]
+        uav2_z = uav2_z[start_index:end_index]
+        overlap_indices = overlap_indices[(overlap_indices >= start_index) & (overlap_indices < end_index)] - start_index
+
+        # Adjust time_seq to start from 0.0
+        time_seq = time_seq - time_seq[0]
+
+        # Store trimmed data
+        all_time_seqs.append(time_seq)
+        all_uav1_z.append(uav1_z)
+        all_uav2_z.append(uav2_z)
+        all_overlap_indices.append(overlap_indices)
+
+    # Find the common time range (minimum length of all time sequences)
+    min_length = min(len(time_seq) for time_seq in all_time_seqs)
+    common_time_seq = all_time_seqs[0][:min_length]  # Use the first time sequence as reference
+
+    # Average the UAV 1 z-positions across all datasets
+    avg_uav1_z = np.mean([uav1_z[:min_length] for uav1_z in all_uav1_z], axis=0)
+
+    # Plot the average UAV 1 z-position
+    ax1.plot(common_time_seq, avg_uav1_z, label='Top UAV (mean)', linewidth=1.5, color='blue')
+
+    # Plot the target line for UAV 2 at -0.75 (red, limited to UAV 2 range)
+    ax1.plot(common_time_seq, [-0.75] * len(common_time_seq), label='Target bottom UAV', linewidth=1.5, linestyle='--', color='red')
+    # Define new colors for UAV 2 trials
+    uav2_colors = ['green', 'purple', 'orange']  # Green, orange, purple
+
+    # Plot all UAV 2 trials
+    uav2_labels = ["baseline", "with Predictor", "with sn. Predictor"]
+    for i, uav2_z in enumerate(all_uav2_z):
+        ax1.plot(common_time_seq, uav2_z[:min_length], label=uav2_labels[i], linewidth=1.5, color=uav2_colors[i])
 
 
+    # Find the global min and max overlap times across all datasets
+    global_min_overlap_time = None
+    global_max_overlap_time = None
 
+    for overlap_indices, time_seq in zip(all_overlap_indices, all_time_seqs):
+        if len(overlap_indices) > 0:
+            min_overlap_time = time_seq[overlap_indices[0]]
+            max_overlap_time = time_seq[overlap_indices[-1]]
 
+            if global_min_overlap_time is None or min_overlap_time < global_min_overlap_time:
+                global_min_overlap_time = min_overlap_time
+            if global_max_overlap_time is None or max_overlap_time > global_max_overlap_time:
+                global_max_overlap_time = max_overlap_time
 
+    # Plot vertical lines for global min and max overlap times
+    if global_min_overlap_time is not None and global_max_overlap_time is not None:
+        ax1.axvline(x=global_min_overlap_time, color='black', linestyle='--', linewidth=1)
+        ax1.axvline(x=global_max_overlap_time, color='black', linestyle='--', linewidth=1)
+
+        # Shade the overlap region
+        ax1.axvspan(global_min_overlap_time, global_max_overlap_time, color='gray', alpha=0.13, label='Overlap Region')
+
+    # Add labels, title, and legend for the main plot
+    ax1.set_xlabel('Time [s]')
+    ax1.set_ylabel('Z-Position [m]')
+    ax1.legend(loc='center right')  # Compact legend
+    ax1.grid(True, linestyle='--', linewidth=0.5)  # Light grid lines
+
+    # Calculate errors for UAV 2 trials
+    overall_errors = []
+    overlap_errors = []
+
+    for i, uav2_z in enumerate(all_uav2_z):
+        # Overall error
+        overall_errors.append(np.abs(uav2_z[:min_length] - (-0.75)))
+
+        # Overlap region error
+        overlap_mask = (common_time_seq >= global_min_overlap_time) & (common_time_seq <= global_max_overlap_time)
+        overlap_errors.append(np.abs(uav2_z[:min_length][overlap_mask] - (-0.75)))
+
+    # Plot upper histogram (overall errors)
+    for i, overall_error in enumerate(overall_errors):
+        ax2.hist(overall_error, bins=20, alpha=0.5, label=f'{uav2_labels[i]}', color=uav2_colors[i])
+
+    # Add labels and legend for the upper histogram
+    #ax2.set_xlabel('Positional Z-Axis Error [m]')
+    ax2.set_ylabel('Count')
+    ax2.set_title('Errors of Total Run')
+    ax2.legend(loc='upper right', fontsize=6)  # Compact legend
+    ax2.grid(True, linestyle='--', linewidth=0.5)  # Light grid lines
+
+    # Plot lower histogram (overlap errors)
+    for i, overlap_error in enumerate(overlap_errors):
+        ax3.hist(overlap_error, bins=20, alpha=0.5, label=f'{uav2_labels[i]}', color=uav2_colors[i])
+
+    # Add labels and legend for the lower histogram
+    ax3.set_xlabel('Positional Z-axis Error [m]')
+    ax3.set_ylabel('Count')
+    ax3.set_title('Errors inside Overlap Region')
+    #ax3.legend(loc='upper right', fontsize=6)  # Compact legend
+    ax3.grid(True, linestyle='--', linewidth=0.5)  # Light grid lines
+
+    # Adjust layout and save the plot
+    plt.tight_layout()
+    plt.savefig('uav_z_positions_with_split_histograms_ieee.pdf', format='pdf', bbox_inches='tight')  # Save as PDF for Overleaf
+
+    # Calculate and print error statistics
+    overlap_mask = (common_time_seq >= global_min_overlap_time) & (common_time_seq <= global_max_overlap_time)
+    calculate_error_statistics(overall_errors[0], overall_errors[1], overall_errors[2], overlap_mask)
+
+    # Show plot
+    plt.show()
 
 
 def extract_data(uav_1_states, uav_2_states, time_seq):
@@ -1841,8 +2056,23 @@ def plot_figure_1_segments(fig, time, array, roll=True, color=None, label=None, 
     plt.title('Average Line and Standard Deviation Over Time')
     plt.legend()
     plt.grid(True)
-    
+ 
+
+
+def create_demo_subfigure_1(path1, path2):
+    """
+    Loads data from two paths and plots them using plot_multiple_segments.
+    """
+    u2_z_dw_forces1, overlap_indices1, overlaps1, time1 = load_scenario_data(path1)
+    u2_z_dw_forces2, overlap_indices2, overlaps2, time2 = load_scenario_data(path2)
+
+    plot_multiple_segments(time1, u2_z_dw_forces1, time2, u2_z_dw_forces2, overlaps1=overlaps1, overlaps2=overlaps2)
+
+
 def plot_subfigure_1_segments(ax, time, array, roll=True, color=None, label=None, overlaps=[]):
+    """
+    Plots segments of a dataset on a given axis, with optional overlaps marked.
+    """
     reset_indices = np.where(np.diff(time) < 0)[0] + 1
     reset_indices = np.append([0], reset_indices)
     reset_indices = np.append(reset_indices, len(time))
@@ -1869,43 +2099,72 @@ def plot_subfigure_1_segments(ax, time, array, roll=True, color=None, label=None
     average_line = np.mean(interpolated_data, axis=0)
     std_dev = np.std(interpolated_data, axis=0)
 
-    ax.plot(common_time, average_line, label='Avg. Force', color='blue')
-    ax.fill_between(common_time, average_line - std_dev, average_line + std_dev, color='lightblue', alpha=0.5, label='Std. of Force')
+    MyBlue2 = (100/255, 160/255, 230/255)
+    ax.plot(common_time, average_line, label='Mean', color="blue", linewidth="1.5")
+    ax.fill_between(common_time, average_line - std_dev, average_line + std_dev, color='lightblue', alpha=0.5, label='Std.')
     
     if len(overlaps) != 0:
         ax.axvline(np.max(overlaps), color='black', linestyle='--')
         ax.axvline(np.min(overlaps), color='black', linestyle='--')
 
-    #ax.set_xlabel('Time [s]')
-    #ax.set_ylabel('Forces [N]')
     ax.legend()
     ax.grid(True)
 
-def plot_multiple_segments(time1, array1, time2, array2, overlaps1=[], overlaps2=[]):
+
+def plot_multiple_segments(time1, array1, time2, array2, overlaps1=[], overlaps2=[], cut_start=0.5):
+    """
+    Plots two datasets in vertically stacked subplots, with overlaps aligned.
+    The second plot is truncated to match the maximum time of the first plot.
+    The first `cut_start` seconds are removed from both plots.
+
+    Parameters:
+        time1 (np.array): Time array for the first dataset.
+        array1 (np.array): Data array for the first dataset.
+        time2 (np.array): Time array for the second dataset.
+        array2 (np.array): Data array for the second dataset.
+        overlaps1 (list): List of overlap times for the first dataset.
+        overlaps2 (list): List of overlap times for the second dataset.
+        cut_start (float): Number of seconds to remove from the start of both plots.
+    """
     fig, axes = plt.subplots(nrows=2, figsize=(3.5, 2.5), sharex=True)  # Two vertically stacked subplots
 
-    # Plot first dataset
-    axes[0].set_title('Bottom UAV external forces in Z-axis')
-    plot_subfigure_1_segments(axes[0], time1, array1, overlaps=overlaps1)
+    # Remove the first `cut_start` seconds from the first dataset
+    time1_trimmed = time1[time1 >= cut_start]
+    array1_trimmed = array1[time1 >= cut_start]
 
-    # Plot second dataset
-    #axes[1].set_title('Dataset 2')
-    plot_subfigure_1_segments(axes[1], time2, array2, overlaps=overlaps2)
+    # Remove the first `cut_start` seconds from the second dataset
+    time2_trimmed = time2[time2 >= cut_start]
+    array2_trimmed = array2[time2 >= cut_start]
 
+    # Plot first dataset (trimmed)
+    plot_subfigure_1_segments(axes[0], time1_trimmed, array1_trimmed, overlaps=overlaps1)
+
+    # Get the maximum time from the first plot (after trimming)
+    max_time_plot1 = max(time1_trimmed)
+
+    # Truncate the second dataset to match the maximum time of the first plot
+    time2_truncated = time2_trimmed[time2_trimmed <= max_time_plot1]
+    array2_truncated = array2_trimmed[time2_trimmed <= max_time_plot1]
+
+    # Plot second dataset (truncated)
+    plot_subfigure_1_segments(axes[1], time2_truncated, array2_truncated, overlaps=overlaps2)
+
+    # Synchronize y-axis limits
     ylim = axes[0].get_ylim()  # Get y-axis limits from the first plot
     axes[1].set_ylim(ylim)  # Apply them to the second plot
     axes[1].legend().set_visible(False)
+    
 
-
+    # Add labels and layout adjustments
     plt.tight_layout()
-    #plt.ylabel('Forces [N]')
     plt.xlabel('Time [s]')
-    fig.text(0.02, 0.5, 'Forces [N]', va='center', rotation='vertical')
-    #handles, labels = axes[0].get_legend_handles_labels()
-    #fig.legend(handles, labels, loc='upper right')  # Single legend for both subplots
+    fig.text(0.02, 0.5, 'Force [N]', va='center', rotation='vertical')
+    plt.savefig("figure_2.pdf", format="pdf", bbox_inches="tight", dpi=300)
     plt.show()
-    #plt.savefig("single_column_figure.pdf", format="pdf", bbox_inches="tight")
-    #plt.close()
+
+
+
+
 
 def compute_rmse(array1, array2, label=None):
     rmse = np.sqrt(np.mean((array1 - array2) ** 2))
@@ -1987,13 +2246,13 @@ def find_file_with_substring(substring):
     return None
 
 
-def find_files_in_folder_with_substring(folder_substring, file_extension):
+def find_files_in_folder_with_substring(folder_substrings, file_extension):
     """
-    Search for folders containing the given substring in their name within the current directory and subdirectories.
+    Search for folders containing any of the given substrings in their name within the current directory and subdirectories.
     Then, return all files with the specified file extension inside those folders.
     
     Args:
-        folder_substring (str): The substring to look for in the folder names.
+        folder_substrings (list): A list of substrings to look for in the folder names.
         file_extension (str): The file extension to look for (e.g., '.txt', '.csv').
     
     Returns:
@@ -2003,8 +2262,8 @@ def find_files_in_folder_with_substring(folder_substring, file_extension):
     matching_files = []
 
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        # Check if the folder name contains the substring
-        if folder_substring in os.path.basename(dirpath):
+        # Check if the folder name contains any of the substrings
+        if any(substring in os.path.basename(dirpath) for substring in folder_substrings):
             # Iterate through all files in the folder
             for filename in filenames:
                 if filename.endswith(file_extension):
@@ -2969,6 +3228,161 @@ class WeightedMSELoss(torch.nn.Module):
 
 
 # evaluation
+
+def evaluate_models_in_folder(model, folder_path, substring, eval_xyz=True):
+    """
+    Evaluates all models in a folder that match a given substring and returns the mean and std of RMSEs for each scenario.
+    
+    Args:
+        model: The model instance to evaluate.
+        folder_path (str): Path to the folder containing the models.
+        substring (str): Substring to match in the filenames.
+        eval_xyz (bool): Whether to evaluate all axes (x, y, z) or just the z-axis.
+    
+    Returns:
+        dict: A dictionary containing the mean and std of RMSEs for each scenario.
+              Example: {"1 fly below": {"mean": 0.1234, "std": 0.0123}, ...}
+    """
+    # Initialize a dictionary to store RMSEs for each scenario
+    scenario_rmse = defaultdict(list)
+
+    # Find all model paths in the folder that match the substring
+    model_paths = find_files_in_folder_with_substring(folder_path, substring)
+
+    # Loop through each model
+    for idx, model_path in enumerate(model_paths):
+        print(f"Evaluating model {idx + 1}/{len(model_paths)}: {model_path}")
+        
+        # Load the model state dict
+        model.load_state_dict(torch.load(model_path, weights_only=True))
+        
+        # Evaluate the model and get RMSEs for each scenario
+        res_dict = evaluate_model_rmse_per_scenario(model, eval_xyz=eval_xyz)
+        
+        # Collect z-axis RMSEs for each scenario
+        for scenario, results in res_dict.items():
+            scenario_rmse[scenario].append(results["Z-Axis"])
+
+    # Compute mean and std of RMSEs for each scenario
+    scenario_stats = {}
+    for scenario, rmses in scenario_rmse.items():
+        mean_rmse = np.mean(rmses)
+        std_rmse = np.std(rmses)
+        scenario_stats[scenario] = {"mean": mean_rmse, "std": std_rmse}
+
+    # Print the results
+    print("\nZ-Axis RMSE Statistics for Each Scenario:")
+    for scenario, stats in scenario_stats.items():
+        print(f"{scenario}:")
+        print(f"  Mean RMSE: {stats['mean']:.4f}")
+        print(f"  Std RMSE: {stats['std']:.4f}")
+
+    print(f"\nTotal models evaluated: {len(model_paths)}")
+
+    return scenario_stats
+
+
+
+
+
+def evaluate_model_rmse_per_scenario(model, eval_xyz=True):
+    """
+    Evaluates the model on validation datasets and returns the RMSE for each scenario.
+    
+    Args:
+        model: The trained model to evaluate.
+        eval_xyz (bool): Whether to evaluate all axes (x, y, z) or just the z-axis.
+    
+    Returns:
+        dict: A dictionary containing the RMSE for each scenario (fly below, fly above, swapping, swapping fast).
+              If `eval_xyz` is True, the RMSE is returned for all axes (x, y, z).
+    """
+    model.to("cpu")
+    model.eval()
+    
+    dataset_titles = [
+        "1 fly below",
+        "2 fly above",
+        "3 swapping",
+        "3 swapping (very fast)"
+    ]
+
+    dataset_paths = [
+        find_file_with_substring("raw_data_1_flybelow_200Hz_80_005_len34951ts_51_iterations_testset.npz"),
+        find_file_with_substring("raw_data_2_flyabove_200Hz_80_005_len32956ts_46_iterations_testset.npz"),
+        find_file_with_substring("raw_data_3_swapping_200Hz_80_005_len29736ts_52_iterations_testset.npz"),
+        find_file_with_substring("raw_data_3_swapping_fast_200Hz_80_005_len20802ts_67_iterations_testset.npz"),
+    ]
+
+    predictions_x = []
+    predictions_y = []
+    predictions_z = []
+
+    truths_x = []
+    truths_y = []
+    truths_z = []
+
+    time = []
+
+    dataset_lengths = []
+    
+    for idx, path_idx in enumerate([[0], [1], [2], [3]]):
+        # Load states to validate on
+        uav_1_states = []
+        uav_2_states = []
+        time_seq = []
+
+        for path in np.array(dataset_paths)[path_idx]:
+            data = np.load(path)
+            uav_1_state, uav_2_state = data['uav_1_states'][:-1], data['uav_2_states'][:-1]
+
+            uav_1_states.extend(uav_1_state)
+            uav_2_states.extend(uav_2_state)
+            time_seq.extend(np.arange(0, len(uav_1_state)))
+
+        dataset_lengths.append(len(uav_1_states))
+
+        rel_state_vector_list = np.array(uav_1_states) - np.array(uav_2_states)
+        _, overlap_indices, overlaps = extract_data(uav_1_states, uav_2_states, time_seq)
+        u2_x_dw_forces, u2_y_dw_forces, u2_z_dw_forces = extract_dw_forces(uav_2_states)
+
+        prediction = model.evaluate(np.array(uav_1_states), np.array(uav_2_states))
+
+        if eval_xyz:
+            predictions_x.append(prediction[:, 0])
+            predictions_y.append(prediction[:, 1])
+            predictions_z.append(prediction[:, 2])
+            truths_x.append(u2_x_dw_forces)
+            truths_y.append(u2_y_dw_forces)
+            truths_z.append(u2_z_dw_forces)
+        else:
+            predictions_z.append(prediction)
+            truths_z.append(u2_z_dw_forces)
+
+        time.append(time_seq)
+
+    # Compute RMSE for each scenario
+    rmse_results = {}
+
+    for idx, title in enumerate(dataset_titles):
+        scenario_results = {}
+
+        # Z-Axis RMSE
+        rmse_z = compute_metrics(truths_z[idx], predictions_z[idx])["RMSE"]
+        scenario_results["Z-Axis"] = rmse_z
+
+        if eval_xyz:
+            # X-Axis RMSE
+            rmse_x = compute_metrics(truths_x[idx], predictions_x[idx])["RMSE"]
+            scenario_results["X-Axis"] = rmse_x
+
+            # Y-Axis RMSE
+            rmse_y = compute_metrics(truths_y[idx], predictions_y[idx])["RMSE"]
+            scenario_results["Y-Axis"] = rmse_y
+
+        rmse_results[title] = scenario_results
+
+    return rmse_results
 
 def print_eval_table(time, truth, predictions, visualize, overlaps, dataset_titles):
     

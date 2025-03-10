@@ -16,6 +16,7 @@ from analytical.model import AnalyticalPredictor, AnalyticalPredictorVectorized
 
 
 #evaluate agile
+"""
 model_paths = find_files_in_folder_with_substring("agile_trained", ".pth")
 
 for model_path in model_paths:
@@ -25,6 +26,20 @@ for model_path in model_paths:
     model.load_state_dict(torch.load(model_path, weights_only=True))
 
     evaluate_model(model, visualize=False, eval_xyz=True)
+"""
+#evaluate agile
+model_paths = find_files_in_folder_with_substring("agile_trained", ".pth")
+
+for model_path in model_paths:
+    print(model_path)
+    #model_path = find_file_with_substring(model_path)
+    model = AgilePredictor(output_dim=3)
+    model.load_state_dict(torch.load(model_path, weights_only=True))
+
+
+    res_dict = evaluate_model_rmse_per_scenario(model, eval_xyz=True)
+
+    print(res_dict["3 swapping"]["Z-Axis"])
 
 # evaluate ndp
 # model_paths = find_files_in_folder_with_substring("ndp", ".pth")
