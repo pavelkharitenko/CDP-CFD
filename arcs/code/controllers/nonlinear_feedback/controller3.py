@@ -32,8 +32,8 @@ class NonlinearFeedbackController3:
         #self.k_p = np.array([4.0,4.0, 32.0]) #np.array([3.0,3.0, 18.0]) 
         #self.k_v = np.array([1.0,1.0, 27.0]) #np.array([3.0,3.0, 15.0]) 
 
-        self.k_p = np.array([4.0,4.0, 32.0]) #np.array([3.0,3.0, 18.0]) 
-        self.k_v = np.array([1.0,1.0, 32.0]) #np.array([3.0,3.0, 15.0]) 
+        self.k_p = np.array([2.0,1.5, 10.0]) #np.array([3.0,3.0, 18.0]) 
+        self.k_v = np.array([1.0,0.8, 10.0]) #np.array([3.0,3.0, 15.0]) 
 
         self.thrust_old = 0.0
         
@@ -46,6 +46,8 @@ class NonlinearFeedbackController3:
         self.acc = np.zeros(3)
 
         self.fxyz = np.zeros(3)
+
+        self.desired_thrust = np.zeros(3)
 
 
     
@@ -114,7 +116,7 @@ class NonlinearFeedbackController3:
                                                                   ) # magnitude
 
         
-        
+        self.desired_thrust = np.array((x_force, y_force, z_force))
         #thrust = np.clip(thrust, 0.0, 40.0)
         return -roll, pitch, self.target_yaw, thrust
     
@@ -127,7 +129,7 @@ class NonlinearFeedbackController3:
 
 
         #f_xyz = f_xyz - feedforward
-        print("f_xyz with feedforward", f_xyz)
+        #print("f_xyz with feedforward", f_xyz)
         return self.set_xyz_force(*f_xyz)
         
 
@@ -139,7 +141,7 @@ class NonlinearFeedbackController3:
 
         self.thrust_dot = thrust - self.thrust_old
 
-        thrust += self.k_d_thrust*self.thrust_dot
+        #thrust += self.k_d_thrust*self.thrust_dot
 
         self.thrust_old = thrust
         #print("thrust:", thrust)

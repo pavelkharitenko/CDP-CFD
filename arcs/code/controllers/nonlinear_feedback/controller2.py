@@ -34,7 +34,7 @@ class NonlinearFeedbackController2:
         
         
 
-        self.Lambda = 3.2
+        self.Lambda = 3.8
         self.Gamma = np.array([0.0,0.0,0.15])
 
         self.pos = np.zeros(3)
@@ -67,7 +67,7 @@ class NonlinearFeedbackController2:
         q_tilde_dot = self.vel - desired[3:6]
         q_tilde_dot_dot = self.acc - desired[6:9]
 
-        print("VELOCITY ERRORS", q_tilde_dot)
+        #print("VELOCITY ERRORS", q_tilde_dot)
         #q_tilde_dot = np.array([q_tilde_dot[0], q_tilde_dot[1], np.clip(q_tilde_dot[2], -0.3,0.3)])
         
         s1 = q_tilde_dot + self.Lambda * q_tilde 
@@ -83,9 +83,7 @@ class NonlinearFeedbackController2:
 
 
         u = self.uav_mass * q_r_dot_dot + self.G - self.k_p * s1 - self.Gamma * self.s2_int
-
         
-
 
         return u
 
@@ -131,7 +129,7 @@ class NonlinearFeedbackController2:
 
 
         f_xyz = f_xyz - feedforward
-        print("after feedforward term", f_xyz)
+        #print("after feedforward term", f_xyz)
         return self.set_xyz_force(*f_xyz)
         
 

@@ -2655,7 +2655,7 @@ def plot_trajectory_analysis_rmse(
     Also computes RMSE for positions and velocities.
     """
     overlap_threshold = 1.0
-    sns.set(style="whitegrid")
+    #sns.set(style="whitegrid")
     plt.rcParams.update({'font.size': 10})
 
     # Compute position and velocity errors for both UAVs
@@ -2767,6 +2767,12 @@ def analyze_forces(uav_forces, thrust_forces, predictor_forces_z, nfc_forces, dt
     uav_z_dw_forces = smoothed_uav_z_forces - uav_z_thrust
 
 
+    nfc_x_forces = [force[0] for force in nfc_forces]
+    nfc_y_forces = [force[1] for force in nfc_forces]
+    nfc_z_forces = [force[2] - 9.81*3.3035 for force in nfc_forces]
+
+
+
 
     # Calculate x-data based on time step
     x = np.arange(len(uav_z_forces)) * dt
@@ -2782,6 +2788,11 @@ def analyze_forces(uav_forces, thrust_forces, predictor_forces_z, nfc_forces, dt
     ax1.plot(x, uav_z_dw_forces, label=f'z-downwash force')
     ax1.plot(x, predictor_forces_z, label=f'predicted z-force')
     ax1.plot(x, [force[2] - 9.81*3.3035 for force in nfc_forces], label=f'NFC z-force')
+
+    ax1.plot(x, smoothed_uav_z_forces - nfc_z_forces, label=f'actual dw force')
+
+
+
 
 
 

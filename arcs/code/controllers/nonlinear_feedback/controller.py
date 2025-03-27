@@ -29,12 +29,12 @@ class NonlinearFeedbackController:
         #self.M = np.eye(3) * self.uav_mass
         self.G = self.uav_mass * np.array([0, 0, self.g])
 
-        self.k_p = np.array([4.0,4.0,4.0]) #np.full(3, 15.0) 
+        self.k_p = np.array([4.0,4.0,12.0]) #np.full(3, 15.0) 
         self.k_i = np.array([0.5,0.0,0.0]) # 0.23
         
         self.k_d = np.full(3, 31.0) * 0.0
 
-        self.Lambda = 7.0
+        self.Lambda = 1.5
 
         self.pos = np.zeros(3)
         self.vel = np.zeros(3)
@@ -47,7 +47,7 @@ class NonlinearFeedbackController:
     def feedback(self, pos, vel, acc):
 
         self.pos = np.array(pos)
-        print("current z pos", pos[2])
+        #print("current z pos", pos[2])
 
         self.vel = np.array(vel)
         self.acc = np.array(acc)
@@ -67,8 +67,8 @@ class NonlinearFeedbackController:
         
         
         self.s_int = s * self.dt + self.s_int
-        print("Ki*s_int", self.k_i*self.s_int)
-        self.s_int = np.clip(self.s_int, -20.0, 20.0)
+        #print("Ki*s_int", self.k_i*self.s_int)
+        #self.s_int = np.clip(self.s_int, -20.0, 20.0)
 
 
 
@@ -85,8 +85,8 @@ class NonlinearFeedbackController:
         
         self.s_old = s
         #self.G = np.zeros(3)
-        print("x_err", np.round(x_err,2))
-        print("v_err", np.round(v_err, 2))
+        #print("x_err", np.round(x_err,2))
+        #print("v_err", np.round(v_err, 2))
         #print("acc_ref", np.round(acc_ref, 2))
         #print("s",s)
         fd = self.uav_mass * acc_ref + self.G - self.k_p * s - self.k_i * self.s_int - self.k_d * s_dot
@@ -112,7 +112,7 @@ class NonlinearFeedbackController:
         q_tilde = self.pos - desired[:3]
         q_tilde_dot = self.vel - desired[3:6]
 
-        print("VELOCITY ERRORS", q_tilde_dot)
+        #print("VELOCITY ERRORS", q_tilde_dot)
         #q_tilde_dot = np.array([q_tilde_dot[0], q_tilde_dot[1], np.clip(q_tilde_dot[2], -0.3,0.3)])
         
         s = q_tilde_dot + self.Lambda * q_tilde
@@ -122,12 +122,9 @@ class NonlinearFeedbackController:
         self.s_int = s * self.dt + self.s_int
 
         self.s_dot = s - self.s_old
-
-
         u = self.uav_mass * q_r_dot_dot + self.G - self.k_p * s # - self.k_i * self.s_int
 
         self.s_old = s
-
 
         return u
 
@@ -169,7 +166,7 @@ class NonlinearFeedbackController:
     def nonlinear_feedback(self, desired, feedforward=np.zeros(3), uav_z_force=0):
         f_xyz = self.pc_nf(desired)
         self.fxyz = f_xyz
-        print("F_xyz from nf controller:", f_xyz)
+        #print("F_xyz from nf controller:", f_xyz)
 
         #if f_xyz[2] < 0.0: 
         #    f_z_des = f_xyz[2]
@@ -180,7 +177,7 @@ class NonlinearFeedbackController:
 
 
         f_xyz = f_xyz - feedforward
-        print("after feedforward term", f_xyz)
+        #print("after feedforward term", f_xyz)
         return self.set_xyz_force(*f_xyz)
         
 
@@ -189,7 +186,7 @@ class NonlinearFeedbackController:
         Nonlinear feedback output force, and converted to RPY-thrust for px4 attitude controller
         """
         roll, pitch, yaw, thrust = self.nonlinear_feedback(desired, feedforward, uav_z_force)
-        print("thrust:", thrust)
+        #print("thrust:", thrust)
 
         roll, pitch, yaw = np.array([roll, pitch, yaw]) * 180.0/np.pi # convert to radians
 
