@@ -5,8 +5,6 @@ sys.path.append('../../utils/')
 from utils import *
 
 
-
-
 class AgileContinousDataset(torch.utils.data.Dataset):
     def __init__(self, experiment_paths):
         self.exp_paths = experiment_paths

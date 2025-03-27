@@ -29,12 +29,6 @@ from uav import *
 
 sys.path.append('../../../observers/')
 
-
-#from ndp.model import DWPredictor
-#from SO2.model import ShallowEquivariantPredictor
-#from model import DWPredictor
-
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -140,7 +134,7 @@ def plot_xy_slices_ndp(model):
 
     fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
     plt.xlabel('Forces in Newton (N)')
-    #plt.ylabel('dummy data')
+    
     
     plt.show()
 
@@ -192,8 +186,7 @@ def plot_zy_yx_slices_ndp(model):
             for j in range(plane_res):
                 plot_f[i, j] = zs[i * plane_res + j]
 
-        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
+        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[0][idx].set_title(f"Z = {z_point}m")
         
@@ -240,7 +233,6 @@ def plot_zy_yx_slices_ndp(model):
 
     fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
     plt.xlabel('Forces in Newton (N)')
-    #plt.ylabel('dummy data')
     
     plt.show()
 
@@ -291,8 +283,7 @@ def plot_z_slices_ndp(model):
             for j in range(plane_res):
                 plot_f[i, j] = zs[i * plane_res + j]
 
-        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
+        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[idx].set_title(f"Z = {z_point}m")
         
@@ -312,7 +303,6 @@ def plot_z_slices_ndp(model):
 
     fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
     plt.xlabel('Forces in Newton (N)')
-    #plt.ylabel('dummy data')
     
     plt.show()
 
@@ -337,8 +327,6 @@ def plot_model_compare(model_list):
         
         model.eval()
         model.to("cuda" if torch.cuda.is_available() else "cpu")
-        
-
 
         # loop over Z-heights and generate plane_res*plane_res sample points
         for idx, z_point in enumerate(xy_plane_z_samples):
@@ -350,7 +338,6 @@ def plot_model_compare(model_list):
                     sample_matrix[i * plane_res + j, 0] = xy_samples[i]
                     sample_matrix[i * plane_res + j, 1] = xy_samples[j]
                     sample_matrix[i * plane_res + j, 2] = z_point
-            
             
             sample_tensor = torch.from_numpy(sample_matrix).to(torch.float32)
             input = torch.autograd.Variable(sample_tensor).cuda()
@@ -375,7 +362,6 @@ def plot_model_compare(model_list):
         
         ax[0][0].set_ylabel('S.N.=2')
         ax[1][0].set_ylabel('S.N.=4')
-        #ax[2][0].set_ylabel('S.N.=6')
         ax[2][0].set_ylabel('No SN')
 
 
@@ -390,8 +376,6 @@ def plot_model_compare(model_list):
 
     fig.suptitle('\n Predicted Downwash Forces acting on Sufferer UAV \n Other drone is Z and Y meters above and right of Sufferer')
     plt.xlabel('Forces in Newton (N)')
-    #plt.ylabel('dummy data')
-    
     plt.show()
 
 # 1 so2
@@ -472,10 +456,8 @@ def plot_xy_slices_so2(model):
                     
                     plot_f[i, j] = pred_dw[2].cpu()
                     plotted_forces.append(pred_dw[2].cpu().numpy())
-               
 
-        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
+        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[idx].set_title(f"Z = {z_point}m")
         
@@ -535,10 +517,8 @@ def plot_zy_xy_slices_so2(model):
                     
                     plot_f[i, j] = pred_dw[2].cpu()
                     plotted_forces.append(pred_dw[2].cpu().numpy())
-               
 
-        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
+        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[0][idx].set_title(f"Z = {z_point}m")
         
@@ -573,10 +553,8 @@ def plot_zy_xy_slices_so2(model):
                     
                     plot_f[i, j] = pred_dw[2].cpu()
                     plotted_forces.append(pred_dw[2].cpu().numpy())
-               
 
-        im = ax[1][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
+        im = ax[1][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[1][idx].set_title(f"Y = {z_point}m")
 
@@ -638,8 +616,7 @@ def plot_zy_yx_slices_ns(model):
             for j in range(plane_res):
                 plot_f[i, j] = zs[i * plane_res + j]
 
-        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
+        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[0][idx].set_title(f"Z = {z_point}m")
         
@@ -675,8 +652,7 @@ def plot_zy_yx_slices_ns(model):
             for j in range(plane_res):
                 plot_f[i, j] = ys[i * plane_res + j]
 
-        im = ax[1][k].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color,
-                             origin='lower', interpolation='none')
+        im = ax[1][k].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[1][k].set_title(f"Y = {test_y}m")
 
@@ -738,8 +714,7 @@ def plot_z_slices_ns(model):
             for j in range(plane_res):
                 plot_f[i, j] = zs[i * plane_res + j]
 
-        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
+        im = ax[idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[idx].set_title(f"Z = {z_point}m")
         
@@ -769,12 +744,7 @@ def plot_zy_xy_slices_empirical(model):
     plane_res = 40 # number of points sampled for plotting in one dimension
 
     color="autumn"
-    test_f = []
-    fig, ax = plt.subplots(2, len(xy_plane_z_samples), sharex=True, sharey=True)
-
-    
-    
-    
+    fig, ax = plt.subplots(2, len(xy_plane_z_samples), sharex=True, sharey=True) 
     plotted_forces = [] # save plotted forces for adjusting min and max value of heatmaps
 
     all_imgs = [] # save all
@@ -796,10 +766,8 @@ def plot_zy_xy_slices_empirical(model):
                 pred_dw = model.F_drag(u1_state, u2_state)[0]
                 plot_f[i, j] = pred_dw[2]
                 plotted_forces.append(pred_dw[2])
-               
 
-        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
+        im = ax[0][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[0][idx].set_title(f"Z = {z_point}m")
         
@@ -827,10 +795,8 @@ def plot_zy_xy_slices_empirical(model):
                 pred_dw = model.F_drag(u1_state, u2_state)[0]
                 plot_f[i, j] = pred_dw[2]
                 plotted_forces.append(pred_dw[2])
-               
 
-        im = ax[1][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], 
-                               cmap=color, origin='lower', interpolation='none')
+        im = ax[1][idx].imshow(plot_f, extent=[-xy_range, xy_range, xy_range, -xy_range], cmap=color, origin='lower', interpolation='none')
         all_imgs.append(im)
         ax[1][idx].set_title(f"Y = {z_point}m")
 
@@ -855,15 +821,8 @@ def plot_3D_forces(model):
     xy_range = 2.0 # size of XY plane
     plane_res = 9 # number of points sampled for plotting in one dimension
 
-    color="autumn_r"
-    test_f = []
-    #fig, ax = plt.subplots(2, len(xy_plane_z_samples), sharex=True, sharey=True, figsize=(6, 6))
-
     model.eval()
     model.to("cuda" if torch.cuda.is_available() else "cpu")
-    
-    plotted_forces = [] 
-    all_imgs = []
 
     # create i x j x k matrix to sample from network forces
     xy_samples = np.linspace(start=-xy_range, stop=xy_range, num=plane_res)
@@ -889,11 +848,8 @@ def plot_3D_forces(model):
     
 
 def plot_3d_vectorfield(startpositions, vectors, scale, title):
-    # normalize for plotting
-    #vectors = vectors / np.linalg.norm(vectors)
-    # iterate over input and output and create 3D plot
 
-    
+    # iterate over input and output and create 3D plot  
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     ax.set_xlabel('X') #, linespacing=4)
@@ -917,7 +873,6 @@ def plot_3d_vectorfield(startpositions, vectors, scale, title):
 
     fig.suptitle(title)
     plt.show()
-    #plt.savefig("3D_DW_dummydata.png")
 
 
 def plot_NN_training(train_errors, val_errors, eval_L_epochs=None):
@@ -980,8 +935,6 @@ def plot_static_dw_collection(state_sufferer, state_producer, ef_sufferer, jft_s
     ax4.legend()
 
 
-
-
 # 2 experiment 
 
 def init_experiment(env_name):  
@@ -995,22 +948,14 @@ def save_experiment(exp_name, uav_list, success, sim_duration, bias=None):
     exp_name += "-" + str(sim_duration) + "sec-" + str(len(uav_list[0].timestamp_list)) + "-ts"
     
     if not success:
-        #print("#### --- during simulation, an error occured, not saving results of experiment", exp_name)
+        
         exit(1)
     else:
-        #print("#### Saving experiment", exp_name, "...")
-       
         exp_obj = {'exp_name': exp_name, 'uav_list': uav_list, 'bias': bias}
-        
-            
 
         save_name = exp_name + '.p'
         with open(save_name, 'wb') as handle:
             pickle.dump(exp_obj, handle)
-        
-
-        #print("#### Saved.")
-        #print("################################")
         return save_name
 
 
@@ -1195,7 +1140,7 @@ def evaluate_zy_force_curvature(models, rel_state_vectors):
     for index, model in enumerate(models):
         dw_forces = model.evaluate(rel_state_vectors)
         predicted_z_curves.append(dw_forces)
-  
+
     return predicted_z_curves
 
 
@@ -1957,7 +1902,6 @@ def compute_thrust_vector(uav_states):
         """
         
         thrusts = rps_to_thrust_p005_mrv80(np.mean(np.abs(uav_states[:,22:26]), axis=1, keepdims=True))
-        #print(thrusts[:5])
         thrust_vectors = np.column_stack((np.zeros(len(thrusts)), np.zeros(len(thrusts)), thrusts))
         rotations = R.from_euler('zyx', uav_states[:,9:12], degrees=False)
         thrust_list = rotations.apply(thrust_vectors) 
@@ -1979,13 +1923,8 @@ def plot_array_with_segments(fig, time, array, roll=True, color=None, label=None
         raise ValueError("The time array and data array must have the same length.")
 
     if not roll:
-        
         #fig.plot(time, array, label=label, color=color)
-
         fig.plot(array, label=label, color=color)
-
-        
-            
         #fig.axvline(overlaps, color='grey', linestyle='--', alpha=0.1)
 
 
@@ -2056,7 +1995,6 @@ def plot_figure_1_segments(fig, time, array, roll=True, color=None, label=None, 
     plt.title('Average Line and Standard Deviation Over Time')
     plt.legend()
     plt.grid(True)
- 
 
 
 def create_demo_subfigure_1(path1, path2):
@@ -2161,9 +2099,6 @@ def plot_multiple_segments(time1, array1, time2, array2, overlaps1=[], overlaps2
     fig.text(0.02, 0.5, 'Force [N]', va='center', rotation='vertical')
     plt.savefig("figure_2.pdf", format="pdf", bbox_inches="tight", dpi=300)
     plt.show()
-
-
-
 
 
 def compute_rmse(array1, array2, label=None):
@@ -2792,10 +2727,6 @@ def analyze_forces(uav_forces, thrust_forces, predictor_forces_z, nfc_forces, dt
     ax1.plot(x, smoothed_uav_z_forces - nfc_z_forces, label=f'actual dw force')
 
 
-
-
-
-
     #ax1.plot(x, uav_y_forces, label=f'UAV y-forces')
     #ax1.plot(x, uav_z_forces, label=f'UAV z-forces')
 
@@ -2932,7 +2863,6 @@ def plot_uav_positions_and_errors(uav1_positions, uav2_positions, target_positio
 # helper functions
 
 
-
 # methods for equivariant transformation
 
 def equivariant_agile_transform(u1_states, u2_states, inference=False):
@@ -3027,7 +2957,6 @@ def continous_transform(equivariant_states):
     #print("continous_transf.dw_decomp", dw_decomp[:3])
 
     #dw_decomp = f_decomp - T2_decomp
-
 
 
     result = (
@@ -3163,44 +3092,11 @@ def orthogonal_projection(dp_xy, dw_xy_rel):
     # projects dw onto dp as if dp were (1,0)
     e_x = normalize_vector(dp_xy)
 
-    #print("e_x", e_x)
     e_y = np.stack([-e_x[:, 1], e_x[:, 0]], axis=1)
-    #print("e_y", e_y)
-
-    #print("dw_xy_rel",dw_xy_rel)
-
-    #print("orthogonal_prog.dw_xy_rel", dw_xy_rel)
-    #print("orthogonal_proj.dp",dp_xy)
 
     dw_abs = dw_xy_rel[:,0:1] * e_x + dw_xy_rel[:,1:2] * e_y
-
-    #print("orthogonal_proj.dw_abs", dw_abs)
     
     return dw_abs
-
-
-
-
-
-# T = [[0.0,1.0], [-1.0,1.0]
-
-# dp = [[0.0,3.0],[0.0,3.0]]
-
-# signed_angles = compute_signed_angles(dp, T)
-
-# print("angles", (180.0/np.pi) * signed_angles)
-
-# print("magnitudes",np.linalg.norm(T, axis=1))
-# decomp = angle_demcomposition(signed_angles, np.linalg.norm(T, axis=1))
-
-# print("decomp", decomp)
-
-
-
-# #magn = normalize_vector(T)
-# #print("Normalized", magn)
-# print("proj", orthogonal_projection(dp, decomp))
-
 
 
 
@@ -3432,9 +3328,6 @@ def print_eval_table(time, truth, predictions, visualize, overlaps, dataset_titl
         metrics["Label"] = dataset_titles[idx]
         all_results.append(metrics)
 
-    
-
-
 
     # Compute average metrics
     average_metrics = {
@@ -3642,7 +3535,7 @@ def h_mapping(delta_p_list, v_B_list, v_A_list):
     epsilon = 1e-10 # for numeric stability
     norm_proj_delta_p = np.where(norm_proj_delta_p < epsilon, epsilon, norm_proj_delta_p)
     norm_proj_v_B = np.where(norm_proj_v_B < epsilon, epsilon, norm_proj_v_B)
- 
+
     feature1 = np.sum(proj_delta_p * proj_v_B, axis=1, keepdims=True) / (norm_proj_delta_p * norm_proj_v_B)
     feature2 = norm_proj_delta_p
     feature3 = norm_proj_v_B

@@ -106,13 +106,11 @@ def train():
     x_train, x_val, y_train, y_val = train_test_split(dataset.x, dataset.y, train_size=0.75, test_size=0.25,
                                                       shuffle=True)
 
-    
-
     # select data subset if needed
-    x_train = x_train[0:-1:1]
-    x_val = x_val[0:-1:1]
-    y_train = y_train[0:-1:1]
-    y_val = y_val[0:-1:1]
+    #x_train = x_train[0:-1:1]
+    #x_val = x_val[0:-1:1]
+    #y_train = y_train[0:-1:1]
+    #y_val = y_val[0:-1:1]
 
 
     # init or load model, optimizer and loss 

@@ -8,9 +8,9 @@ class UAV():
         # init properties
         self.total_mass = 3.3035
         self.inertia_matrix_body = np.array([
-            [0.05487, 0,       0],
-            [0,       0.05487, 0],
-            [0,       0,       0.1027]
+            [0.05487, 0, 0],
+            [0, 0.05487, 0],
+            [0, 0, 0.1027]
         ])
         self.inertia_matrix_body_rotors = np.array([
             [0.0566739, 0, 0],
@@ -33,7 +33,7 @@ class UAV():
         self.jft_sensor_names = joint_force_torque_sensor_names
         self.ef_sensor_names = external_force_sensors_names
         self.rotor_sensor_names = rotor_joint_sensor_names
-        self.states = [] # contains Px, Py, Pz, Vx,Vy,Vz, Ax,Ay,Az, Yaw,Pitch,Roll, qw,qx,qy,qz, r1_rps, r2_rps, r3_rps, r4_rps,  --> should also contain input u or force or each rotor in future
+        self.states = [] # contains Px, Py, Pz, Vx,Vy,Vz, Ax,Ay,Az, Yaw,Pitch,Roll, qw,qx,qy,qz, r1_rps, r2_rps, r3_rps, r4_rps
         self.jft_forces_list = []
         self.ext_forces_list = []
         self.rotor_rps_list = []
@@ -54,10 +54,10 @@ class UAV():
         self.reply = reply
         # read xyz pos, xyz vel, xyz acc, yaw-pitch-roll, rot.  and torques:
         state = self.read_sensor(reply, self.imu_idx, 
-                                 [0,1,2, 6,7,8, 12,13,14, # [0,1,2, 3,4,5, 6,7,8] xyz pos, vel, acc
-                                  3,4,5, 9,10,11, # [9,10,11, 12,13,14] yaw, pitch, roll, w_roll, w_pithc, w_yaw,
-                                  15,16,17,  # [15,16,17] roll_dot, pitch_dot, yaw_dot
-                                  18,19,20,21]) # [18,19,20,21] quaternions w, x, y, z
+                                 [0,1,2, 6,7,8, 12,13,14,   # [0,1,2, 3,4,5, 6,7,8] xyz pos, vel, acc
+                                  3,4,5, 9,10,11,           # [9,10,11, 12,13,14] yaw, pitch, roll, w_roll, w_pithc, w_yaw,
+                                  15,16,17,                 # [15,16,17] roll_dot, pitch_dot, yaw_dot
+                                  18,19,20,21])             # [18,19,20,21] quaternions w, x, y, z
                                 # ([22,23,24,25]) rotor velocities (in rad, per second)
         
         
@@ -90,7 +90,6 @@ class UAV():
                                                        r1_r2_r3_r4_rps[2], r1_r2_r3_r4_rps[3],
                                                        k, d)
 
-            #print("####### Rotor speed:", np.mean(np.abs(r1_r2_r3_r4_rps)))
             # Display the results
             #print(f"Total Thrust: {F} N")
             #print(f"Controller Roll Torque (τx): {tau_x} Nm")
@@ -107,8 +106,6 @@ class UAV():
         # append angular accelerations
 
         self.states.append(state)
-
-        #print("new state:", len(self.states[-1]) , self.states[-1])
         
         # update current time
         self.timestamp_list.append(timestep)
@@ -133,7 +130,6 @@ class UAV():
         if isinstance(sensor_names, list):
             result = []
             for sensor_name in sensor_names:
-                #print(sensor_name, self.controller.get_sensor_info(sensor_name).index)
                 result.append(self.controller.get_sensor_info(sensor_name).index)
             return result
         else:
@@ -151,7 +147,6 @@ class UAV():
         sensor_tuple_data = reply.get_sensor_output(sensor_idx)
 
         for i in indicies:
-            #print("### sensor tuple of ", sensor_idx, sensor_tuple_data)
             result.append(sensor_tuple_data[i])
         if len(result) == 1:
             return result[0]
@@ -176,13 +171,7 @@ class UAV():
         return result
 
 
-
-
-
-
 def plot_uav_statistics(uav_list, begin=None, end=None):
-    
-    
 
     fig, axes = plt.subplots(3,len(uav_list))
 

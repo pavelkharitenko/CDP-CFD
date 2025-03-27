@@ -26,7 +26,6 @@ class DWPredictor(nn.Module):
         )
 
     def forward(self,x):
-        #x = self.flatten(x)
         return self.linear_relu_stack(x)
     
 

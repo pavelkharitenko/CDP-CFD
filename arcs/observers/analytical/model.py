@@ -207,24 +207,6 @@ class AnalyticalPredictor():
 
         return np.array(predicted_forces)
 
-#ap = AnalyticalPredictor()
-#rel_state = [[0.0, 0.0, 0.5, 0, 0, 0]]
-#print(ap.evaluate(rel_state))
-
-#plot_zy_xy_slices_empirical(ap)
-
-# exp_path = r"C:\Users\admin\Desktop\IDP\CDP-CFD\arcs\code\data_collection\ndp-data-collection\data\two-P600-both-moving-100Hz\2024-10-08-15-38-29-Dataset-NDP-2-P600-flush-frank-720.0sec-72001-ts.p"
-# exp = load_forces_from_dataset(exp_path)
-# uav_1, uav_2 = exp['uav_list']
-
-# ep = AnalyticalPredictor()
-
-# state = 653
-# #state = 20
-
-# ep(uav_1.states[state], uav_2.states[state])
-
-
 
 
 class AnalyticalPredictorVectorized():

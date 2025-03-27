@@ -47,11 +47,8 @@ class SO2Dataset(torch.utils.data.Dataset):
             y = np.vstack((y,y_i))
 
 
-        print("extracted and mapped total X data with length:", len(x))
-        print("extracted total Y labels with length:", len(y))
-
-            
-            
+        #print("extracted and mapped total X data with length:", len(x))
+        #print("extracted total Y labels with length:", len(y))  
     
         self.x =  torch.tensor(x).to(torch.float32)
         self.y =  torch.tensor(y).to(torch.float32)
