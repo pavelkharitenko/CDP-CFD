@@ -1,3 +1,16 @@
+
+
+
+## Observer RMSE DW prediction results
+
+| Method            | Fly Below | Fly Above | Swapping | Swapping (Fast) | Total Avg. |
+|------------------|----------|----------|----------|----------------|------------|
+| Neural-Swarm    | 1.58     | 1.64     | 3.44     | 2.46           | 2.28       |
+| NDP             | **1.27** | 2.18     | 4.01     | 2.06           | 2.38       |
+| SO(2)-Equiv.    | 2.37     | 2.14     | 3.36     | 3.14           | 2.75       |
+| Empirical       | 2.83     | 5.16     | 7.69     | 7.53           | 5.80       |
+| Agile (Proposed) | 1.48     | **1.29** | **2.73** | **1.49**       | **1.75**   |
+
 ## Repository Structure
 
 ```
