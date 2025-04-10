@@ -74,16 +74,16 @@ def main(controller):
 
     # load disturbance predictor
 
-    #predictor = AgileShallowPredictor()
-    #predictor.load_state_dict(torch.load(find_file_with_substring("upbeat-elk30"), weights_only=True))
+    predictor = AgilePredictor()
+    predictor.load_state_dict(torch.load(find_file_with_substring("upbeat-elk30"), weights_only=True))
     predictor = AgilePredictor(output_dim=3)
 
-    predictor.load_state_dict(torch.load(find_file_with_substring("proper-hardball"), weights_only=True))
+    #predictor.load_state_dict(torch.load(find_file_with_substring("proper-hardball"), weights_only=True))
     #predictor.load_state_dict(torch.load(find_file_with_substring("brave-photometry"), weights_only=True))
 
 
-    ndp_predictor = DWPredictor()
-    ndp_predictor.load_state_dict(torch.load(find_file_with_substring("adaptive-partition20"), weights_only=True))
+    #ndp_predictor = DWPredictor()
+    #ndp_predictor.load_state_dict(torch.load(find_file_with_substring("adaptive-partition20"), weights_only=True))
 
 
     time_seq = []
