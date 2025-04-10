@@ -1,8 +1,9 @@
 import torch
-from torch.distributions import MultivariateNormal
-from networks import FeedForwardNN
-
 from torch.optim import Adam
+from torch.distributions import MultivariateNormal
+import numpy as np
+
+from networks import FeedForwardNN
 
 class PPO:
     def __init__(self, env):
@@ -15,21 +16,22 @@ class PPO:
 
         # 1 init networks and params theta
         self.actor = FeedForwardNN(self.obs_dim, self.act_dim)
-        self.actor_optim = Adam(self.actor.parameters(), lr=self.lr())
+        self.actor_optim = Adam(self.actor.parameters(), lr=self.lr)
         self.critic = FeedForwardNN(self.obs_dim, 1)
+        self.critic_optim = Adam(self.critic.parameters(), lr=self.lr)
 
         self.cov_var = torch.full(size=(self.act_dim,), fill_value=0.5)
         self.cov_mat = torch.diag(self.cov_var)
 
     def _init_hyper_parameters(self):
-        self.timesteps_per_batch = 4800
-        self.max_timesteps_per_episode = 1600
+        self.timesteps_per_batch = 1000
+        self.max_timesteps_per_episode = 200
         self.gamma = 0.95
         self.n_updates_per_iteration = 5
         self.clip = 0.2
-        self.lr = 5e-3
-
-    
+        self.lr = 5e-4
+        self.max_grad_norm = 0.5
+   
     def get_action(self, obs):
         mean = self.actor(obs)
 
@@ -47,12 +49,11 @@ class PPO:
             discounted_reward = 0
 
             for rew in reversed(ep_rews):
-                discounted_reward += rew + self.gamma * discounted_reward
+                discounted_reward = rew + self.gamma * discounted_reward
                 batch_rtgs.insert(0, discounted_reward)
 
         batch_rtgs = torch.tensor(batch_rtgs, dtype=torch.float) # convert to tensor
         return batch_rtgs
-
 
     def rollout(self):
         # batch data
@@ -63,12 +64,16 @@ class PPO:
         batch_rtgs = []
         batch_lens = []
 
+        # doing rollout: 
+        print("doing rollout...")
+
         # collect set of trajectories D with policy pi_theta
         t = 0 # number of timesteps for this batch
         while t < self.timesteps_per_batch:
             ep_rews = []
 
-            obs = self.env.reset()
+            obs, _ = self.env.reset()
+            
             done = False
 
             for ep_t in range(self.max_timesteps_per_episode):
@@ -77,14 +82,14 @@ class PPO:
                 # collect observation
                 batch_obs.append(obs)
                 action, log_prob = self.get_action(obs)
-                returned_info = self.env.step(action)
-                print(" ### size of ret. info", len(returned_info))
-                obs, rew, done, _ = returned_info
+                obs, rew, terminated, truncated, _ = self.env.step(action)
 
                 # record in batch
                 ep_rews.append(rew)
                 batch_acts.append(action)
                 batch_log_probs.append(log_prob)
+
+                done = terminated or truncated
 
                 if done:
                     break
@@ -100,15 +105,15 @@ class PPO:
 
         return batch_obs, batch_acts, batch_log_probs, batch_rtgs, batch_lens
 
-
     def evaluate(self, batch_obs, batch_acts):
         V = self.critic(batch_obs).squeeze()
         mean = self.actor(batch_obs)
+        
+
         dist = MultivariateNormal(mean, self.cov_mat)
         log_probs = dist.log_prob(batch_acts)
 
         return V, log_probs # return V_phi_k and pi_new
-
 
     def learn(self, total_timesteps):
         t_so_far = 0
@@ -123,9 +128,10 @@ class PPO:
             A_k = batch_rtgs - V.detach()
 
             A_k = (A_k - A_k.mean()) / (A_k.std() + 1e-10)
+            
 
             for _ in range(self.n_updates_per_iteration):
-                _, curr_log_probs = self.evaluate(batch_obs, batch_acts)
+                V, curr_log_probs = self.evaluate(batch_obs, batch_acts)
 
                 # update policy:
                 
@@ -135,18 +141,24 @@ class PPO:
 
                 # theta_new = argmax_theta = 1/len(D) * sum[t~D] sum[t=0,T] min(pi_new/pi_theta * A_, clip(eps, A_pi_theta) via gradient ascent
                 actor_loss = (-torch.min(surr1, surr2)).mean()
-
                 self.actor_optim.zero_grad()
-                actor_loss.backward()
+                actor_loss.backward(retain_graph=True)
+                torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
                 self.actor_optim.step()
                 
+                # fit V_t estimate on regression loss: phi_new = ... ( V_phi - R_t )^2 via gradient descent
+                critic_loss = torch.nn.MSELoss()(V, batch_rtgs)
+                self.critic_optim.zero_grad()
+                critic_loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
+
+                self.critic_optim.step()
 
 
-
-                
-
-            # fit V_t estimate on regression loss: phi_new = ... ( V_phi - R_t )^2 via gradient descent
-            
+            t_so_far += np.sum(batch_lens)
 
 
-
+import gymnasium as gym
+env = gym.make('Pendulum-v1')
+model = PPO(env)
+model.learn(10000)
