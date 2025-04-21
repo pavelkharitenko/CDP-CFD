@@ -20,13 +20,13 @@ def main(controller):
     nan = float('NaN')
 
     # exp specific
-    SAVE_EXP = True
+    SAVE_EXP = False
     dataset_name="demo_1_flybelow"
     SIM_MAX_DURATION = 80.0
 
     SAVE_INTERVALL = 800.0
     # episode specific
-    HOVER_DURATION = 20.0
+    HOVER_DURATION = 2.0
     ITERATION_TIME = HOVER_DURATION + 2.5
     exp_name = init_experiment(MANUEVER_NAME)
     total_iterations = 0
