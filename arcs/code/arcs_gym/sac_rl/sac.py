@@ -198,7 +198,11 @@ class SACAgent:
         return actor_loss.data, qf_loss.data, vf_loss.data, alpha_loss.data 
 
 
+    def _target_soft_update(self):
+        tau = self.tau
 
+        for t_param, l_param in zip(self.vf_target.parameters(), self.vf.parameters()):
+            t_param.data.copy_(tau * l_param.data + (1.0 - tau) * t_param.data)
 
 
 
